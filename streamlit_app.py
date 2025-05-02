@@ -12,6 +12,15 @@ pio.templates.default = 'simple_white'
 # Streamlit Page Config
 st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 
+# Add custom CSS to adjust the font size of dropdowns
+st.markdown("""
+    <style>
+        .stSelectbox div[data-baseweb="select"] {
+            font-size: 18px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 
 # Add mapping for local SICBL names
 sicbl_legend_mapping = {
