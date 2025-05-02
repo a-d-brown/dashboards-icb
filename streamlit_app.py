@@ -242,8 +242,9 @@ col1, col2 = st.columns(2)
 
 with col1:
     # SICBL dropdown
+    st.markdown('<p style="font-size: 20px;">Select SICBL:</p>', unsafe_allow_html=True)
     sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
-    selected_sicbl = st.selectbox("Select SICBL:", options=sicbl_options)
+    selected_sicbl = st.selectbox("", options=sicbl_options)
 
 with col2:
     # Practice dropdown
