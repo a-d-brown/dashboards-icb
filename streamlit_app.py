@@ -10,7 +10,7 @@ import streamlit as st
 pio.templates.default = 'simple_white'
 
 # Streamlit Page Config
-st.set_page_config(page_title="HRT Dashboard", layout="wide")
+st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 
 # Add mapping for local SICBL names
 sicbl_legend_mapping = {
@@ -70,7 +70,7 @@ total_list_size = saba_means_merged['List Size'].sum()
 icb_average_spend = (total_actual_spend / total_list_size) * 1000
 
 # Streamlit Layout
-st.title("Hormone Replacement Therapy (HRT) Dashboard")
+st.title("NENC Medicines Optimisation Workstream Dashboard")
 
 st.header('Spend on SABAs: ICB-wide comparison in the last 3m')
 
@@ -220,14 +220,22 @@ st.plotly_chart(bar_dynamic, use_container_width=True)
 
 st.header("Spend on SABAs: Local Trends")
 
-# SICBL and Practice dropdowns
-sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
-selected_sicbl = st.selectbox("Select SICBL:", options=sicbl_options)
-selected_sicbl_code = sicbl_reverse_mapping[selected_sicbl]  # Map back to code
+# Create two columns for the dropdowns to be displayed side by side
+col1, col2 = st.columns(2)
 
-filtered_practices = practice_data[practice_data['sicbl'] == selected_sicbl_code]
-practice_options = sorted(filtered_practices['practice'].unique())
-selected_practice = st.selectbox("Select Practice:", options=practice_options)
+with col1:
+    # SICBL dropdown
+    sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
+    selected_sicbl = st.selectbox("Select SICBL:", options=sicbl_options)
+
+with col2:
+    # Practice dropdown
+    selected_sicbl_code = sicbl_reverse_mapping[selected_sicbl]  # Map back to code
+    filtered_practices = practice_data[practice_data['sicbl'] == selected_sicbl_code]
+    practice_options = sorted(filtered_practices['practice'].unique())
+    selected_practice = st.selectbox("Select Practice:", options=practice_options)
+
+
 
 # Interactive Graph Function
 def update_graph(sicbl_code, selected_practice):
@@ -254,7 +262,7 @@ def update_graph(sicbl_code, selected_practice):
             name=f"{pcn_practice} (same PCN)",
             hovertemplate=(
                 pcn_practice + '<br>' +
-                'HRT Items per 1000 Patients: %{y:.1f}<br>' +
+                'Items per 1000 Patients: %{y:.1f}<br>' +
                 'Time Period: %{customdata}<extra></extra>'
             ),
             showlegend=False
@@ -269,7 +277,7 @@ def update_graph(sicbl_code, selected_practice):
         name=f"{selected_practice}",
         hovertemplate=(
             selected_practice + '<br>' +
-            'HRT Items per 1000 Patients: %{y:.1f}<br>' +
+            'Items per 1000 Patients: %{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
         showlegend=False
@@ -283,7 +291,7 @@ def update_graph(sicbl_code, selected_practice):
         customdata=selected_data['formatted_date'],
         hovertemplate=(
             'National Average<br>' +
-            'HRT Items per 1000 Patients: %{y:.1f}<br>' +
+            'Items per 1000 Patients: %{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
         line=dict(color='#2A6FBA', width=2),
