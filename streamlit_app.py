@@ -18,6 +18,8 @@ st.markdown("""
         .stSelectbox div[data-baseweb="select"] {
             font-size: 18px;
             width: 800px;
+            margin-top: 0px;
+            margin-bottom: 5px; 
         }
     </style>
 """, unsafe_allow_html=True)
@@ -242,15 +244,17 @@ col1, col2 = st.columns(2)
 
 with col1:
     # SICBL dropdown
+    st.markdown('<p style="font-size: 20px;">Select SICBL:</p>', unsafe_allow_html=True)
     sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
-    selected_sicbl = st.selectbox("Select SICBL:", options=sicbl_options)
+    selected_sicbl = st.selectbox("", options=sicbl_options)
 
 with col2:
     # Practice dropdown
+    st.markdown('<p style="font-size: 20px;">Select Practice:</p>', unsafe_allow_html=True)
     selected_sicbl_code = sicbl_reverse_mapping[selected_sicbl]  # Map back to code
     filtered_practices = practice_data[practice_data['sicbl'] == selected_sicbl_code]
     practice_options = sorted(filtered_practices['practice'].unique())
-    selected_practice = st.selectbox("Select Practice:", options=practice_options)
+    selected_practice = st.selectbox("", options=practice_options)
 
 
 
