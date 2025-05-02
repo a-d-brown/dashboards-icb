@@ -15,22 +15,13 @@ st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 # Add custom CSS to adjust the font size of dropdowns
 st.markdown("""
     <style>
-        /* Reduce the vertical gap between the label and dropdown */
-        .stSelectbox {
-            margin-top: 0px !important;      /* No space above the selectbox */
-            margin-bottom: 5px !important;   /* Adjust this value as needed */
-        }
-
-        /* Reduce space between label and selectbox */
-        .stTextInput label, .stSelectbox label {
-            margin-bottom: 0px !important;   /* Remove margin below the label */
-        }
         .stSelectbox div[data-baseweb="select"] {
             font-size: 18px;
-            width: 800px;
+            width: 700px;
         }
     </style>
 """, unsafe_allow_html=True)
+
 
 # Add mapping for local SICBL names
 sicbl_legend_mapping = {
@@ -252,17 +243,15 @@ col1, col2 = st.columns(2)
 
 with col1:
     # SICBL dropdown
-    st.markdown('<p style="font-size: 20px;">Select SICBL:</p>', unsafe_allow_html=True)
     sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
-    selected_sicbl = st.selectbox("", options=sicbl_options)
+    selected_sicbl = st.selectbox("Select SICBL:", options=sicbl_options)
 
 with col2:
     # Practice dropdown
-    st.markdown('<p style="font-size: 20px;">Select Practice:</p>', unsafe_allow_html=True)
     selected_sicbl_code = sicbl_reverse_mapping[selected_sicbl]  # Map back to code
     filtered_practices = practice_data[practice_data['sicbl'] == selected_sicbl_code]
     practice_options = sorted(filtered_practices['practice'].unique())
-    selected_practice = st.selectbox("", options=practice_options)
+    selected_practice = st.selectbox("Select Practice:", options=practice_options)
 
 
 
