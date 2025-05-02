@@ -175,7 +175,7 @@ bar_dynamic.update_layout(
     height=700,
     width=1150,
     xaxis_title='',
-    yaxis_title='',
+    yaxis_title='SABA Spend per 1000 Patients',
     yaxis_tickprefix="£",
     legend_title_text=None,
     xaxis=dict(
@@ -233,6 +233,8 @@ st.plotly_chart(bar_dynamic, use_container_width=True)
 
 
 
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
 
 ## --- Local Trends Section ---
 
@@ -244,7 +246,7 @@ col1, col2 = st.columns(2)
 with col1:
     # SICBL dropdown
     sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
-    selected_sicbl = st.selectbox("Select SICBL:", options=sicbl_options)
+    selected_sicbl = st.selectbox("Select Sub-location:", options=sicbl_options)
 
 with col2:
     # Practice dropdown
@@ -280,7 +282,7 @@ def update_graph(sicbl_code, selected_practice):
             name=f"{pcn_practice} (same PCN)",
             hovertemplate=(
                 pcn_practice + '<br>' +
-                'Items per 1000 Patients: %{y:.1f}<br>' +
+                'Spend per 1000 Patients: £%{y:.1f}<br>' +
                 'Time Period: %{customdata}<extra></extra>'
             ),
             showlegend=False
@@ -295,7 +297,7 @@ def update_graph(sicbl_code, selected_practice):
         name=f"{selected_practice}",
         hovertemplate=(
             selected_practice + '<br>' +
-            'Items per 1000 Patients: %{y:.1f}<br>' +
+            'Spend per 1000 Patients: £%{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
         showlegend=False
@@ -309,7 +311,7 @@ def update_graph(sicbl_code, selected_practice):
         customdata=selected_data['formatted_date'],
         hovertemplate=(
             'National Average<br>' +
-            'Items per 1000 Patients: %{y:.1f}<br>' +
+            'Spend per 1000 Patients: £%{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
         line=dict(color='#2A6FBA', width=2),
@@ -351,7 +353,8 @@ def update_graph(sicbl_code, selected_practice):
 
     fig.update_layout(
         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
-        margin=dict(b=100)
+        margin=dict(b=100),
+         yaxis_tickprefix="£"
     )
 
     return fig
