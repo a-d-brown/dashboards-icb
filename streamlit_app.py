@@ -12,6 +12,7 @@ pio.templates.default = 'simple_white'
 # Streamlit Page Config
 st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 
+
 # Add mapping for local SICBL names
 sicbl_legend_mapping = {
     '84H': 'Durham',
@@ -72,6 +73,8 @@ icb_average_spend = (total_actual_spend / total_list_size) * 1000
 # Streamlit Layout
 st.title("NENC Medicines Optimisation Workstream Dashboard")
 
+
+## Bar Chart Comparison
 st.header('Spend on SABAs: ICB-wide comparison in the last 3m')
 
 # Initialize session state for toggles
@@ -79,7 +82,7 @@ for subloc in sub_location_colors.keys():
     if f"subloc_toggle_{subloc}" not in st.session_state:
         st.session_state[f"subloc_toggle_{subloc}"] = True
 
-# --- New Neat Toggle UI ---
+# --- Toggle UI ---
 # Create a column for each sublocation
 cols = st.columns(len(sub_location_colors))
 rerun_needed = False
@@ -208,6 +211,11 @@ bar_dynamic.add_annotation(
     xref="paper",
     yref="y",
     xanchor="left",
+    yanchor="middle"
+)
+
+bar_dynamic.update_layout(
+    margin=dict(r=100)  # Increase the right margin to allow space for annotation
 )
 
 # Display the chart
@@ -216,7 +224,7 @@ st.plotly_chart(bar_dynamic, use_container_width=True)
 
 
 
-# --- Local Trends Section ---
+## --- Local Trends Section ---
 
 st.header("Spend on SABAs: Local Trends")
 
