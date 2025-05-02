@@ -15,7 +15,7 @@ st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 # Add custom CSS to adjust the font size of dropdowns
 st.markdown("""
     <style>
-        .stLabel {
+        .stTextInput label, .stSelectbox label {
             font-size: 20px;
         }
         .stColumn {
