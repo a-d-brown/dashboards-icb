@@ -321,7 +321,8 @@ def update_graph(sicbl_code, selected_practice):
 
     fig.update_layout(
         yaxis_title='SABA Spend per 1000 Patients',
-        template='simple_white'
+        template='simple_white',
+        height=700
     )
 
     last_nat_date = national_data['date'].max()
