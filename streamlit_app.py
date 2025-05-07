@@ -17,7 +17,8 @@ st.markdown("""
     <style>
         .stSelectbox div[data-baseweb="select"] {
             font-size: 18px;
-            width: 700px;
+            width: 100%;
+            max-width: 800px;
         }
     </style>
 """, unsafe_allow_html=True)
