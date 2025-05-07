@@ -31,8 +31,8 @@ sicbl_legend_mapping = {
     '01H': 'Cumbria',
     '13T': 'Newcastle-Gateshead',
     '16C': 'Tees Valley',
-    '00N': 'North Tyneside',
-    '99C': 'South Tyneside'
+    '99C': 'North Tyneside',
+    '00N': 'South Tyneside'
 }
 
 # Add reverse mapping for SICBL names back to codes
