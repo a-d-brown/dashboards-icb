@@ -126,11 +126,20 @@ for i, (subloc, color) in enumerate(sub_location_colors.items()):
 
         # Sublocation name with optional strikethrough and reduced font size
         row_1[1].markdown(
-            f"""
-            <span style='font-weight: bold; font-size: 13px; cursor: pointer;  vertical-align: top; {strikethrough_style}'>
+            f"""<div title="{subloc}" style='
+                font-weight: bold;
+                font-size: 13px;
+                cursor: default;
+                vertical-align: top;
+                text-align: left;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 12vw;
+                min-width: 60px;
+                {strikethrough_style}'>
                 {subloc}
-            </span>
-            """,
+            </div>""",
             unsafe_allow_html=True
         )
 
