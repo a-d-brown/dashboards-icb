@@ -52,26 +52,26 @@ sub_location_colors = {
 }
 
 # Load data into dataframes
-practice_data = pd.read_csv("pcn_practice_data.csv")
-saba_data = pd.read_csv("sabas_by_practice_nenc.csv")
+saba_line_chart_data = pd.read_csv("pcn_practice_data.csv") # will need to load all measure data immediately
+saba_bar_chart_data = pd.read_csv("sabas_by_practice_nenc.csv")
 
 # Data preprocessing
-practice_data['date'] = pd.to_datetime(practice_data['date'], format='%Y%m')
-practice_data['practice'] = practice_data['practice'].str.title()
-saba_data['Practice'] = saba_data['Practice'].str.title()
-saba_data = saba_data[saba_data['PCN'] != 'DUMMY']
-saba_data['Commissioner / Provider Code'] = saba_data['Commissioner / Provider Code'].str.slice(0, -2)
-practice_data['formatted_date'] = practice_data['date'].dt.strftime('%b %Y')
+saba_line_chart_data['date'] = pd.to_datetime(saba_line_chart_data['date'], format='%Y%m')
+saba_line_chart_data['practice'] = saba_line_chart_data['practice'].str.title()
+saba_bar_chart_data['Practice'] = saba_bar_chart_data['Practice'].str.title()
+saba_bar_chart_data = saba_bar_chart_data[saba_bar_chart_data['PCN'] != 'DUMMY']
+saba_bar_chart_data['Commissioner / Provider Code'] = saba_bar_chart_data['Commissioner / Provider Code'].str.slice(0, -2)
+saba_line_chart_data['formatted_date'] = saba_line_chart_data['date'].dt.strftime('%b %Y')
 
 # Summarize SABA data
-summary = saba_data.groupby(['Practice Code', 'Year Month'], as_index=False)[['Items', 'Actual Cost']].sum()
-base = saba_data.drop_duplicates(subset=['Practice Code', 'Year Month']).drop(columns=['Items', 'Actual Cost', 'BNF Chemical Substance'])
-saba_data_merged = pd.merge(base, summary, on=['Practice Code', 'Year Month'])
-saba_data_merged['BNF Chemical Substance Code'] = '0301011_MERGED'
+summary = saba_bar_chart_data.groupby(['Practice Code', 'Year Month'], as_index=False)[['Items', 'Actual Cost']].sum()
+base = saba_bar_chart_data.drop_duplicates(subset=['Practice Code', 'Year Month']).drop(columns=['Items', 'Actual Cost', 'BNF Chemical Substance'])
+saba_bar_chart_data_merged = pd.merge(base, summary, on=['Practice Code', 'Year Month'])
+saba_bar_chart_data_merged['BNF Chemical Substance Code'] = '0301011_MERGED'
 
 # Calculate means
-means = saba_data_merged.groupby('Practice Code', as_index=False)[['List Size', 'Actual Cost', 'Items']].mean().round(0)
-base = saba_data_merged.drop_duplicates(subset='Practice Code').drop(columns=['List Size', 'Actual Cost', 'Items', 'Year Month'])
+means = saba_bar_chart_data_merged.groupby('Practice Code', as_index=False)[['List Size', 'Actual Cost', 'Items']].mean().round(0)
+base = saba_bar_chart_data_merged.drop_duplicates(subset='Practice Code').drop(columns=['List Size', 'Actual Cost', 'Items', 'Year Month'])
 saba_means_merged = pd.merge(base, means, on='Practice Code')
 saba_means_merged['Sub-location'] = saba_means_merged['Commissioner / Provider Code'].map(sicbl_legend_mapping)
 saba_means_merged['Spend per 1000 Patients'] = ((saba_means_merged['Actual Cost'] / saba_means_merged['List Size'])*1000).round(1)
@@ -86,7 +86,7 @@ st.title("NENC Medicines Optimisation Workstream Dashboard")
 
 
 ## Bar Chart Comparison
-st.header('Spend on SABAs: ICB-wide comparison in the last 3m')
+st.header('Spend on SABAs: ICB-wide comparison in the last 3m')   #will refactor to draw text and datafile from list of {dropdowns later}
 
 # Initialize session state for toggles
 for subloc in sub_location_colors.keys():
@@ -255,13 +255,13 @@ col1, col2 = st.columns(2)
 
 with col1:
     # SICBL dropdown
-    sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(practice_data['sicbl'].unique()) if sicbl != 'National']
+    sicbl_options = [sicbl_legend_mapping.get(sicbl, sicbl) for sicbl in sorted(saba_line_chart_data['sicbl'].unique()) if sicbl != 'National']
     selected_sicbl = st.selectbox("Select Sub-location:", options=sicbl_options)
 
 with col2:
     # Practice dropdown
     selected_sicbl_code = sicbl_reverse_mapping[selected_sicbl]  # Map back to code
-    filtered_practices = practice_data[practice_data['sicbl'] == selected_sicbl_code]
+    filtered_practices = saba_line_chart_data[saba_line_chart_data['sicbl'] == selected_sicbl_code]
     practice_options = sorted(filtered_practices['practice'].unique())
     selected_practice = st.selectbox("Select Practice:", options=practice_options)
 
@@ -269,15 +269,15 @@ with col2:
 
 # Interactive Graph Function
 def update_graph(sicbl_code, selected_practice):
-    selected_data = practice_data[(practice_data['sicbl'] == sicbl_code) & (practice_data['practice'] == selected_practice)]
+    selected_data = saba_line_chart_data[(saba_line_chart_data['sicbl'] == sicbl_code) & (saba_line_chart_data['practice'] == selected_practice)]
 
     if selected_data.empty:
         st.warning("No data available for the selected SICBL and practice.")
         return go.Figure()  # Return an empty figure to avoid breaking Streamlit
 
     pcn_code = selected_data['pcn_code'].iloc[0]
-    pcn_practices = practice_data[(practice_data['pcn_code'] == pcn_code) & (practice_data['practice'] != selected_practice)]
-    national_data = practice_data[practice_data['region'] == 'National']
+    pcn_practices = saba_line_chart_data[(saba_line_chart_data['pcn_code'] == pcn_code) & (saba_line_chart_data['practice'] != selected_practice)]
+    national_data = saba_line_chart_data[saba_line_chart_data['sicbl'] == 'National']
 
     fig = go.Figure()
 
