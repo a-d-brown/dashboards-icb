@@ -47,6 +47,12 @@ sub_location_colors = {
     'South Tyneside': '#bcbd22'
 }
 
+def format_date_column(df):
+    df.rename(columns={'Year Month': 'date'}, inplace=True)
+    df['date'] = pd.to_datetime(df['date'], format='%Y%m')
+    df['formatted_date'] = df['date'].dt.strftime('%b %Y')
+    return df
+
 # Load data
 saba_data = pd.read_csv("__SABAs - ICB Dashboard.csv")
 saba_data_national = pd.read_csv("__SABAs - ICB Dashboard NATIONAL.csv")
@@ -54,23 +60,18 @@ saba_data_national = pd.read_csv("__SABAs - ICB Dashboard NATIONAL.csv")
 # Data preprocessing
 saba_data = saba_data[saba_data['PCN'] != 'DUMMY']
 saba_data = saba_data[~saba_data['Practice'].str.contains(r'\( ?[CD] ?\d', na=False)]
-saba_data['Practice'] = saba_data['Practice'].str.rstrip(',')
-saba_data['Practice'] = saba_data['Practice'].str.title()
+saba_data['Practice'] = saba_data['Practice'].str.rstrip(',').str.title()
 saba_data['Commissioner / Provider Code'] = saba_data['Commissioner / Provider Code'].str.slice(0, -2)
 saba_data['sub_location'] = saba_data['Commissioner / Provider Code'].map(sicbl_legend_mapping)
-saba_data.rename(columns={'Year Month': 'date'}, inplace=True)
-saba_data['date'] = pd.to_datetime(saba_data['date'], format='%Y%m')
-saba_data['formatted_date'] = saba_data['date'].dt.strftime('%b %Y')
+saba_data = format_date_column(saba_data)
 saba_data['date_period'] = saba_data['date'].dt.to_period('M')
 
-saba_data_national.rename(columns={'Year Month': 'date'}, inplace=True)
-saba_data_national['date'] = pd.to_datetime(saba_data_national['date'], format='%Y%m')
-saba_data_national['formatted_date'] = saba_data_national['date'].dt.strftime('%b %Y')
+saba_data_national = format_date_column(saba_data_national)
 
 # Aggregate ICB SABA data across chemical substances
 summary = saba_data.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage']].sum().round(1)
-base = saba_data.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
-saba_data_merged = pd.merge(base, summary, on=['Practice', 'date_period'])
+base_aggregate = saba_data.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
+saba_data_merged = pd.merge(base_aggregate, summary, on=['Practice', 'date_period'])
 saba_data_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
 # Aggregate NATIONAL SABA data across chemical substances
@@ -81,11 +82,10 @@ saba_data_national_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregate
 
 # Bar chart ------------
 # Calculate mean spend and items in last 3m
-last_3_months = saba_data_merged['date'].drop_duplicates().sort_values(ascending=False).head(3) # Get the latest 3 unique months
-recent_data = saba_data_merged[saba_data_merged['date'].isin(last_3_months)] # Filter df to those 3 months
+recent_data = saba_data_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
 means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage']].mean().round(1) # Calculate means
-base = saba_data_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create metadata base
-saba_means_merged = pd.merge(base, means, on='Practice') # Merge base with means
+base_means = saba_data_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create metadata base
+saba_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
 saba_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
     (saba_means_merged['Actual Cost'] / saba_means_merged['List Size']) * 1000
@@ -264,7 +264,7 @@ def update_graph(sub_location, selected_practice):
 
     last_date = selected_data['date'].max()
     last_value = selected_data[selected_data['date'] == last_date]['Spend per 1000 Patients'].values[0]
-    
+
     fig.add_annotation(
         x=last_date,
         y=last_value,
