@@ -54,6 +54,7 @@ saba_data_national = pd.read_csv("__SABAs - ICB Dashboard NATIONAL.csv")
 # Data preprocessing
 saba_data = saba_data[saba_data['PCN'] != 'DUMMY']
 saba_data = saba_data[~saba_data['Practice'].str.contains(r'\( ?[CD] ?\d', na=False)]
+saba_data['Practice'] = saba_data['Practice'].str.rstrip(',')
 saba_data['Practice'] = saba_data['Practice'].str.title()
 saba_data['Commissioner / Provider Code'] = saba_data['Commissioner / Provider Code'].str.slice(0, -2)
 saba_data['sub_location'] = saba_data['Commissioner / Provider Code'].map(sicbl_legend_mapping)
