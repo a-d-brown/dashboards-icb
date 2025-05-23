@@ -47,7 +47,7 @@ sub_location_colors = {
     'South Tyneside': '#bcbd22'
 }
 
-# Load data into dataframes
+# Load data
 saba_data = pd.read_csv("__SABAs - ICB Dashboard.csv")
 saba_data_national = pd.read_csv("__SABAs - ICB Dashboard NATIONAL.csv")
 
@@ -58,7 +58,6 @@ saba_data['Practice'] = saba_data['Practice'].str.rstrip(',')
 saba_data['Practice'] = saba_data['Practice'].str.title()
 saba_data['Commissioner / Provider Code'] = saba_data['Commissioner / Provider Code'].str.slice(0, -2)
 saba_data['sub_location'] = saba_data['Commissioner / Provider Code'].map(sicbl_legend_mapping)
-
 saba_data.rename(columns={'Year Month': 'date'}, inplace=True)
 saba_data['date'] = pd.to_datetime(saba_data['date'], format='%Y%m')
 saba_data['formatted_date'] = saba_data['date'].dt.strftime('%b %Y')
@@ -68,24 +67,25 @@ saba_data_national.rename(columns={'Year Month': 'date'}, inplace=True)
 saba_data_national['date'] = pd.to_datetime(saba_data_national['date'], format='%Y%m')
 saba_data_national['formatted_date'] = saba_data_national['date'].dt.strftime('%b %Y')
 
-# Summarise LOCAL SABA data
+# Aggregate ICB SABA data across chemical substances
 summary = saba_data.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage']].sum().round(1)
 base = saba_data.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
 saba_data_merged = pd.merge(base, summary, on=['Practice', 'date_period'])
 saba_data_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
-# Summarise NATIONAL SABA data
+# Aggregate NATIONAL SABA data across chemical substances
 national_summary = saba_data_national.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage']].sum().round(1)
 national_base = saba_data_national.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
 saba_data_national_merged = pd.merge(national_base, national_summary, on=['date'])
 saba_data_national_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
-# Calculate mean spend and items in last 3m for bar chart
+# Bar chart ------------
+# Calculate mean spend and items in last 3m
 last_3_months = saba_data_merged['date'].drop_duplicates().sort_values(ascending=False).head(3) # Get the latest 3 unique months
 recent_data = saba_data_merged[saba_data_merged['date'].isin(last_3_months)] # Filter df to those 3 months
-means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage']].mean().round(1) # Calculate the means
-base = saba_data_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create the metadata base
-saba_means_merged = pd.merge(base, means, on='Practice') # Merge
+means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage']].mean().round(1) # Calculate means
+base = saba_data_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create metadata base
+saba_means_merged = pd.merge(base, means, on='Practice') # Merge base with means
 
 saba_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
     (saba_means_merged['Actual Cost'] / saba_means_merged['List Size']) * 1000
@@ -94,19 +94,21 @@ saba_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1
 saba_means_merged['Items'] = saba_means_merged['Items'].round(0).astype(int) # Round item count
 saba_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
-# ICB Average Spend for bar chart
+# ICB Average Spend
 total_actual_spend = saba_means_merged['Actual Cost'].sum()
 total_list_size = saba_means_merged['List Size'].sum()
 icb_average_spend = (total_actual_spend / total_list_size) * 1000
 
-# Calculate items per patient for line chart
+# Line Chart ------------
+# Calculate items per patient
 saba_data_merged['Spend per 1000 Patients'] = ((saba_data_merged['Actual Cost'] / saba_data_merged['List Size']) * 1000).round(1)
 saba_data_national_merged['Spend per 1000 Patients'] = ((saba_data_national_merged['Actual Cost'] / saba_data_national_merged['List Size']) * 1000).round(1)
 
-# Streamlit Layout
+
+### STREAMLIT LAYOUT ------------
 st.title("NENC Medicines Optimisation Workstream Dashboard")
 
-# Bar Chart Comparison
+# Bar chart ------------
 st.header('Spend on SABAs: ICB-wide comparison in the last 3m')
 
 # Initialize session state for toggles
@@ -186,7 +188,7 @@ st.plotly_chart(bar_dynamic, use_container_width=True)
 
 st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
-# --- Local Trends Section ---
+# Line Chart ------------
 st.header("Spend on SABAs: Local Trends")
 
 col1, col2 = st.columns(2)
@@ -202,25 +204,15 @@ with col2:
 
 def update_graph(sub_location, selected_practice):
     selected_data = saba_data_merged[(saba_data_merged['sub_location'] == sub_location) & (saba_data_merged['Practice'] == selected_practice)]
-
-    if selected_data.empty:
-        st.warning("No data available for the selected SICBL and practice.")
-        return go.Figure()
-
     selected_data = selected_data.groupby('date', as_index=False).agg({'Spend per 1000 Patients': 'sum'})
     selected_data['formatted_date'] = selected_data['date'].dt.strftime('%b %Y')
 
     pcn_code_values = saba_data_merged[(saba_data_merged['sub_location'] == sub_location) & (saba_data_merged['Practice'] == selected_practice)]['PCN Code'].dropna().unique()
-    if len(pcn_code_values) == 0:
-        st.warning("No PCN code found for this practice.")
-        return go.Figure()
-
     pcn_code = pcn_code_values[0]
     pcn_practices = saba_data_merged[(saba_data_merged['PCN Code'] == pcn_code) & (saba_data_merged['Practice'] != selected_practice)]
     pcn_practices = pcn_practices.groupby(['Practice', 'date'], as_index=False)['Spend per 1000 Patients'].sum()
     
     national_data = saba_data_national_merged[saba_data_national_merged['Country'] == 'ENGLAND']
-
 
     fig = go.Figure()
 
@@ -272,6 +264,7 @@ def update_graph(sub_location, selected_practice):
 
     last_date = selected_data['date'].max()
     last_value = selected_data[selected_data['date'] == last_date]['Spend per 1000 Patients'].values[0]
+    
     fig.add_annotation(
         x=last_date,
         y=last_value,
