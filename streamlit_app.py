@@ -109,18 +109,18 @@ national_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated
 recent_data = icb_data_raw_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
 means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage']].mean().round(1) # Calculate means
 base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create metadata base
-saba_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
+icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
-saba_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
-    (saba_means_merged['Actual Cost'] / saba_means_merged['List Size']) * 1000
+icb_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
+    (icb_means_merged['Actual Cost'] / icb_means_merged['List Size']) * 1000
 ).round(1)
 
-saba_means_merged['Items'] = saba_means_merged['Items'].round(0).astype(int) # Round item count
-saba_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
+icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
+icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
 # ICB Average Spend
-total_actual_spend = saba_means_merged['Actual Cost'].sum()
-total_list_size = saba_means_merged['List Size'].sum()
+total_actual_spend = icb_means_merged['Actual Cost'].sum()
+total_list_size = icb_means_merged['List Size'].sum()
 icb_average_spend = (total_actual_spend / total_list_size) * 1000
 
 # Line Chart ------------
@@ -164,7 +164,7 @@ if rerun_needed:
 selected_sublocations = [subloc for subloc in sub_location_colors.keys() if st.session_state[f"subloc_toggle_{subloc}"]]
 
 # Filter data based on selected sub_locations
-filtered_data = saba_means_merged[saba_means_merged['sub_location'].isin(selected_sublocations)]
+filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
 show_xticks = len(selected_sublocations) == 1
 
 # Create updated bar chart
