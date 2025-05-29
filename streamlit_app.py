@@ -61,6 +61,10 @@ def load_data(dataset_type):
     elif dataset_type == 'Opioids':
         icb_data_raw = pd.read_csv("__Opioids - ICB Dashboard.csv")
         national_data_raw = pd.read_csv("__Opioids - ICB Dashboard NATIONAL.csv")
+    elif dataset_type == 'Lidocaine':
+        icb_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard.csv")
+        national_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard NATIONAL.csv")
+
     
     # Data preprocessing for selected dataset
     icb_data_raw = icb_data_raw[icb_data_raw['PCN'] != 'DUMMY']
@@ -82,7 +86,7 @@ with col1:
     st.title("NENC Medicines Optimisation Workstream Dashboard")
 
 with col2:
-    dataset_type = st.selectbox("Select Dataset:", options=["SABAs", "Opioids"], key="data_type_selector")
+    dataset_type = st.selectbox("Select Dataset:", options=["SABAs", "Opioids", "Lidocaine"], key="data_type_selector")
 
 # Load data based on the selected dataset
 icb_data_raw, national_data_raw = load_data(dataset_type)
