@@ -64,7 +64,6 @@ def load_data(dataset_type):
     elif dataset_type == 'Lidocaine Patches':
         icb_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard.csv")
         national_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard NATIONAL.csv")
-
     
     # Data preprocessing for selected dataset
     icb_data_raw = icb_data_raw[icb_data_raw['PCN'] != 'DUMMY']
@@ -87,6 +86,7 @@ with col1:
 
 with col2:
     dataset_type = st.selectbox("Select Dataset:", options=["SABAs", "Opioids", "Lidocaine Patches"], key="data_type_selector")
+    measure_type = st.selectbox("Select Measure:", options=["Spend per 1000 Patients", "Items per 1000 Patients"], key="measure_selector")
 
 # Load data based on the selected dataset
 icb_data_raw, national_data_raw = load_data(dataset_type)
@@ -103,37 +103,56 @@ national_base = national_data_raw.drop_duplicates(subset=['date']).drop(columns=
 national_data_raw_merged = pd.merge(national_base, national_summary, on=['date'])
 national_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
-# Bar chart ------------
-
 # Calculate mean spend and items in last 3m
 recent_data = icb_data_raw_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
 means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage']].mean().round(1) # Calculate means
 base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create metadata base
 icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
+# Calculate 3m mean rates
 icb_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
     (icb_means_merged['Actual Cost'] / icb_means_merged['List Size']) * 1000
 ).round(1)
+icb_means_merged['Items per 1000 Patients'] = (         # Calculate Items per 1000 Patients
+    (icb_means_merged['Items'] / icb_means_merged['List Size']) * 1000
+).round(1)
 
+# Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
+
+# Calculate ICB Average Values
+total_actual_cost = icb_means_merged['Actual Cost'].sum()
+total_items = icb_means_merged['Items'].sum()
+total_list_size = icb_means_merged['List Size'].sum()
+
+icb_average_spend = (total_actual_cost / total_list_size) * 1000  # Spend per 1000 Patients
+icb_average_items = (total_items / total_list_size) * 1000  # Items per 1000 Patients
+
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
-# ICB Average Spend
-total_actual_spend = icb_means_merged['Actual Cost'].sum()
-total_list_size = icb_means_merged['List Size'].sum()
-icb_average_spend = (total_actual_spend / total_list_size) * 1000
 
 # Line Chart ------------
 
-# Calculate items per patient
+# Calculate monthly rates
 icb_data_raw_merged['Spend per 1000 Patients'] = ((icb_data_raw_merged['Actual Cost'] / icb_data_raw_merged['List Size']) * 1000).round(1)
 national_data_raw_merged['Spend per 1000 Patients'] = ((national_data_raw_merged['Actual Cost'] / national_data_raw_merged['List Size']) * 1000).round(1)
+icb_data_raw_merged['Items per 1000 Patients'] = ((icb_data_raw_merged['Items'] / icb_data_raw_merged['List Size']) * 1000).round(1)
+national_data_raw_merged['Items per 1000 Patients'] = ((national_data_raw_merged['Items'] / national_data_raw_merged['List Size']) * 1000).round(1)
 
 ### STREAMLIT LAYOUT ------------
 
+# Adjusting chart logic based on 'Select Measure' value
+measure_col = 'Spend per 1000 Patients' if measure_type == 'Spend per 1000 Patients' else 'Items per 1000 Patients'
+
+if measure_type == 'Spend per 1000 Patients':
+    icb_average_value = icb_average_spend
+else:
+    icb_average_value = icb_average_items
+
+
 # Bar chart ------------
 
-st.header(f'Spend on {dataset_type}: ICB-wide comparison in the last 3m')
+st.header(f'{measure_type} on {dataset_type}: ICB-wide comparison in the last 3m')
 
 # Initialize session state for toggles
 for subloc in sub_location_colors.keys():
@@ -169,11 +188,11 @@ show_xticks = len(selected_sublocations) == 1
 
 # Create updated bar chart
 bar_dynamic = px.bar(
-    filtered_data.sort_values('Spend per 1000 Patients', ascending=False),
+    filtered_data.sort_values(measure_col, ascending=False),
     x='Practice',
-    y='Spend per 1000 Patients',
+    y=measure_col,
     hover_name='Practice',
-    hover_data={'sub_location': False, 'Practice': False, 'Spend per 1000 Patients': True, 'Items (monthly average)': True},
+    hover_data={'sub_location': False, 'Practice': False, measure_col: True, 'Items (monthly average)': True},
     color='sub_location',
     color_discrete_map=sub_location_colors,
 )
@@ -182,8 +201,8 @@ bar_dynamic.update_layout(
     height=700,
     width=1150,
     xaxis_title='',
-    yaxis_title=f'{dataset_type} Spend per 1000 Patients',
-    yaxis_tickprefix="£",
+    yaxis_title=f'{dataset_type} {measure_type}',
+    yaxis_tickprefix="£" if measure_type == 'Spend per 1000 Patients' else "",
     legend_title_text=None,
     xaxis=dict(showticklabels=show_xticks, showgrid=False, tickangle=45, tickfont=dict(size=10)),
     yaxis=dict(showgrid=False),
@@ -195,12 +214,12 @@ bar_dynamic.update_layout(
 bar_dynamic.update_traces(width=0.6)
 
 bar_dynamic.add_shape(
-    type="line", x0=0, x1=1, y0=icb_average_spend, y1=icb_average_spend,
+    type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
     line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"
 )
 
 bar_dynamic.add_annotation(
-    x=1, y=icb_average_spend,
+    x=1, y=icb_average_value,
     text="ICB Average",
     showarrow=False,
     font=dict(size=12, color="black"),
@@ -208,9 +227,11 @@ bar_dynamic.add_annotation(
     xanchor="left", yanchor="middle"
 )
 
+# Render the bar chart
 st.plotly_chart(bar_dynamic, use_container_width=True)
 
 st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
 
 # Line Chart ------------
 
@@ -227,16 +248,17 @@ with col2:
     practice_options = sorted(filtered_practices['Practice'].unique())
     selected_practice = st.selectbox("Select Practice:", options=practice_options)
 
+# Define update_graph function to handle local trends chart
 def update_graph(sub_location, selected_practice):
     selected_data = icb_data_raw_merged[(icb_data_raw_merged['sub_location'] == sub_location) & (icb_data_raw_merged['Practice'] == selected_practice)]
-    selected_data = selected_data.groupby('date', as_index=False).agg({'Spend per 1000 Patients': 'sum'})
+    selected_data = selected_data.groupby('date', as_index=False).agg({measure_col: 'sum'})
     selected_data['formatted_date'] = selected_data['date'].dt.strftime('%b %Y')
 
     pcn_code_values = icb_data_raw_merged[(icb_data_raw_merged['sub_location'] == sub_location) & (icb_data_raw_merged['Practice'] == selected_practice)]['PCN Code'].dropna().unique()
     pcn_code = pcn_code_values[0]
     pcn_practices = icb_data_raw_merged[(icb_data_raw_merged['PCN Code'] == pcn_code) & (icb_data_raw_merged['Practice'] != selected_practice)]
-    pcn_practices = pcn_practices.groupby(['Practice', 'date'], as_index=False)['Spend per 1000 Patients'].sum()
-    
+    pcn_practices = pcn_practices.groupby(['Practice', 'date'], as_index=False)[measure_col].sum()
+
     national_data = national_data_raw_merged[national_data_raw_merged['Country'] == 'ENGLAND']
 
     fig = go.Figure()
@@ -245,13 +267,13 @@ def update_graph(sub_location, selected_practice):
         data = pcn_practices[pcn_practices['Practice'] == pcn_practice]
         fig.add_trace(go.Scatter(
             x=data['date'],
-            y=data['Spend per 1000 Patients'],
+            y=data[measure_col],
             mode='lines',
             line=dict(color='rgba(255, 99, 132, 0.2)', width=1),
             name=f"{pcn_practice} (same PCN)",
             hovertemplate=( 
                 pcn_practice + '<br>' +
-                'Spend per 1000 Patients: £%{y:.1f}<br>' +
+                'Value: %{y:.1f}<br>' +
                 'Time Period: %{x|%b %Y}<extra></extra>' 
             ),
             showlegend=False
@@ -259,14 +281,14 @@ def update_graph(sub_location, selected_practice):
 
     fig.add_trace(go.Scatter(
         x=selected_data['date'],
-        y=selected_data['Spend per 1000 Patients'],
+        y=selected_data[measure_col],
         mode='lines',
         line=dict(color='firebrick', width=2),
         customdata=selected_data['formatted_date'],
         name=f"{selected_practice}",
         hovertemplate=(
-            selected_practice + '<br>' +
-            'Spend per 1000 Patients: £%{y:.1f}<br>' +
+            selected_practice + f'<br>' +
+            'Value: %{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
         showlegend=False
@@ -274,13 +296,13 @@ def update_graph(sub_location, selected_practice):
 
     fig.add_trace(go.Scatter(
         x=national_data['date'],
-        y=national_data['Spend per 1000 Patients'],
+        y=national_data[measure_col],
         mode='lines',
         name='National Average',
         customdata=national_data['formatted_date'],
         hovertemplate=(
             'National Average<br>' +
-            'Spend per 1000 Patients: \£%{y:.1f}<br>' +
+            'Value: %{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
         line=dict(color='#2A6FBA', width=2),
@@ -288,7 +310,7 @@ def update_graph(sub_location, selected_practice):
     ))
 
     last_date = selected_data['date'].max()
-    last_value = selected_data[selected_data['date'] == last_date]['Spend per 1000 Patients'].values[0]
+    last_value = selected_data[selected_data['date'] == last_date][measure_col].values[0]
 
     fig.add_annotation(
         x=last_date,
@@ -302,16 +324,16 @@ def update_graph(sub_location, selected_practice):
     )
 
     fig.update_layout(
-        yaxis_title=f'{dataset_type} Spend per 1000 Patients',
+        yaxis_title=f'{dataset_type} {measure_type}',
         template='simple_white',
         height=700,
         legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
         margin=dict(b=100),
-        yaxis_tickprefix="£"
+        yaxis_tickprefix="£" if measure_type == 'Spend per 1000 Patients' else "",
     )
 
     last_nat_date = national_data['date'].max()
-    last_nat_value = national_data[national_data['date'] == last_nat_date]['Spend per 1000 Patients'].values[0]
+    last_nat_value = national_data[national_data['date'] == last_nat_date][measure_col].values[0]
 
     fig.add_annotation(
         x=last_nat_date,
