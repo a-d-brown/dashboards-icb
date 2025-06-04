@@ -84,6 +84,9 @@ def load_data(dataset_type):
 # Streamlit layout for main title and dropdown side by side
 col1, col2 = st.columns([3, 1])
 
+with col1:
+    st.title("NENC Medicines Optimisation Workstream Dashboard")
+
 with col2:
     dataset_type = st.selectbox(
         "Select Dataset:",
