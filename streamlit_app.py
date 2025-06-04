@@ -84,32 +84,47 @@ def load_data(dataset_type):
 # Streamlit layout for main title and dropdown side by side
 col1, col2 = st.columns([3, 1])
 
-with col1:
-    st.title("NENC Medicines Optimisation Workstream Dashboard")
-
 with col2:
-    dataset_type = st.selectbox("Select Dataset:", options=["SABAs", "Opioids", "Lidocaine Patches", "Antibacterials"], key="data_type_selector")
-    measure_type = st.selectbox("Select Measure:", options=["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"], key="measure_selector")
+    dataset_type = st.selectbox(
+        "Select Dataset:",
+        options=["SABAs", "Opioids", "Lidocaine Patches", "Antibacterials"],
+        key="data_type_selector"
+    )
+
+    # Dynamically assign measure options
+    if dataset_type == "Antibacterials":
+        measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"]
+    else:
+        measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"]
+
+    measure_type = st.selectbox("Select Measure:", options=measure_options, key="measure_selector")
 
 # Load data based on the selected dataset
 icb_data_raw, national_data_raw = load_data(dataset_type)
 
+# Ensure missing measure columns default to zero to avoid KeyErrors
+for col in ['ADQ Usage', 'DDD Usage']:
+    if col not in icb_data_raw:
+        icb_data_raw[col] = 0
+    if col not in national_data_raw:
+        national_data_raw[col] = 0
+
 # Aggregate data across chemical substances
-summary = icb_data_raw.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage']].sum().round(1)
-base_aggregate = icb_data_raw.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
+summary = icb_data_raw.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
+base_aggregate = icb_data_raw.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
 icb_data_raw_merged = pd.merge(base_aggregate, summary, on=['Practice', 'date_period'])
 icb_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
 # Aggregate NATIONAL data across chemical substances
-national_summary = national_data_raw.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage']].sum().round(1)
-national_base = national_data_raw.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
+national_summary = national_data_raw.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
+national_base = national_data_raw.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
 national_data_raw_merged = pd.merge(national_base, national_summary, on=['date'])
 national_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
 # Calculate mean spend and items in last 3m
 recent_data = icb_data_raw_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
-means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage']].mean().round(1) # Calculate means
-base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'date', 'formatted_date']) # Create metadata base
+means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']].mean().round(1) # Calculate means
+base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']) # Create metadata base
 icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
 # Calculate 3m mean rates
@@ -122,6 +137,9 @@ icb_means_merged['Items per 1000 Patients'] = (         # Calculate Items per 10
 icb_means_merged['ADQ per 1000 Patients'] = (         # Calculate Items per 1000 Patients
     (icb_means_merged['ADQ Usage'] / icb_means_merged['List Size']) * 1000
 ).round(1)
+icb_means_merged['DDD per 1000 Patients'] = (         # Calculate Items per 1000 Patients
+    (icb_means_merged['DDD Usage'] / icb_means_merged['List Size']) * 1000
+).round(1)
 
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
@@ -130,11 +148,14 @@ icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Rou
 total_actual_cost = icb_means_merged['Actual Cost'].sum()
 total_items = icb_means_merged['Items'].sum()
 total_adq = icb_means_merged['ADQ Usage'].sum()
+total_ddd = icb_means_merged['DDD Usage'].sum()
 total_list_size = icb_means_merged['List Size'].sum()
 
 icb_average_spend = (total_actual_cost / total_list_size) * 1000  # Spend per 1000 Patients
 icb_average_items = (total_items / total_list_size) * 1000  # Items per 1000 Patients
 icb_average_adq = (total_adq / total_list_size) * 1000  # ADQ per 1000 Patients
+icb_average_ddd = (total_ddd / total_list_size) * 1000  # DDD per 1000 Patients
+
 
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
@@ -148,6 +169,8 @@ icb_data_raw_merged['Items per 1000 Patients'] = ((icb_data_raw_merged['Items'] 
 national_data_raw_merged['Items per 1000 Patients'] = ((national_data_raw_merged['Items'] / national_data_raw_merged['List Size']) * 1000).round(1)
 icb_data_raw_merged['ADQ per 1000 Patients'] = ((icb_data_raw_merged['ADQ Usage'] / icb_data_raw_merged['List Size']) * 1000).round(1)
 national_data_raw_merged['ADQ per 1000 Patients'] = ((national_data_raw_merged['ADQ Usage'] / national_data_raw_merged['List Size']) * 1000).round(1)
+icb_data_raw_merged['DDD per 1000 Patients'] = ((icb_data_raw_merged['DDD Usage'] / icb_data_raw_merged['List Size']) * 1000).round(1)
+national_data_raw_merged['DDD per 1000 Patients'] = ((national_data_raw_merged['DDD Usage'] / national_data_raw_merged['List Size']) * 1000).round(1)
 
 ### STREAMLIT LAYOUT ------------
 
@@ -160,6 +183,8 @@ elif measure_type == "Items per 1000 Patients":
     icb_average_value = icb_average_items
 elif measure_type == "ADQ per 1000 Patients":
     icb_average_value = icb_average_adq
+elif measure_type == "DDD per 1000 Patients":
+    icb_average_value = icb_average_ddd
 
 
 # Bar chart ------------
