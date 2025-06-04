@@ -86,11 +86,36 @@ col1, col2 = st.columns([3, 1])
 
 with col1:
     st.markdown("""
-        <h1 style='display: flex; align-items: center; font-size: 3em;'>
-            NENC Medicines Optimisation Workstream Dashboard
-            <span style='background-color: #ffc107; color: black; font-size: 0.5em; margin-left: 12px; padding: 2px 8px; border-radius: 4px;'>BETA</span>
-        </h1>
+        <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        ">
+            <div style="
+                font-size: clamp(20px, 4vw, 36px);
+                font-weight: bold;
+            ">
+                NENC Medicines Optimisation Workstream Dashboard
+            </div>
+            <div style="
+                background-color: #ffc107;
+                color: black;
+                font-size: 1em;
+                padding: 2px 8px;
+                border-radius: 4px;
+                margin-top: 0.3em;
+            ">
+                BETA
+            </div>
+        </div>
     """, unsafe_allow_html=True)
+
+
+
+
+
+
 
 
 with col2:
