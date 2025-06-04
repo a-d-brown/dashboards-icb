@@ -64,6 +64,9 @@ def load_data(dataset_type):
     elif dataset_type == 'Lidocaine Patches':
         icb_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard.csv")
         national_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard NATIONAL.csv")
+    elif dataset_type == 'Antibacterials':
+        icb_data_raw = pd.read_csv("__Antibacterials - ICB Dashboard.csv")
+        national_data_raw = pd.read_csv("__Antibacterials - ICB Dashboard NATIONAL.csv")
     
     # Data preprocessing for selected dataset
     icb_data_raw = icb_data_raw[icb_data_raw['PCN'] != 'DUMMY']
@@ -85,13 +88,13 @@ with col1:
     st.title("NENC Medicines Optimisation Workstream Dashboard")
 
 with col2:
-    dataset_type = st.selectbox("Select Dataset:", options=["SABAs", "Opioids", "Lidocaine Patches"], key="data_type_selector")
-    measure_type = st.selectbox("Select Measure:", options=["Spend per 1000 Patients", "Items per 1000 Patients"], key="measure_selector")
+    dataset_type = st.selectbox("Select Dataset:", options=["SABAs", "Opioids", "Lidocaine Patches", "Antibacterials"], key="data_type_selector")
+    measure_type = st.selectbox("Select Measure:", options=["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"], key="measure_selector")
 
 # Load data based on the selected dataset
 icb_data_raw, national_data_raw = load_data(dataset_type)
 
-# Aggregate data as before for SABA or Opioid data
+# Aggregate data across chemical substances
 summary = icb_data_raw.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage']].sum().round(1)
 base_aggregate = icb_data_raw.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'BNF Chemical Substance plus Code'])
 icb_data_raw_merged = pd.merge(base_aggregate, summary, on=['Practice', 'date_period'])
@@ -116,6 +119,9 @@ icb_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 10
 icb_means_merged['Items per 1000 Patients'] = (         # Calculate Items per 1000 Patients
     (icb_means_merged['Items'] / icb_means_merged['List Size']) * 1000
 ).round(1)
+icb_means_merged['ADQ per 1000 Patients'] = (         # Calculate Items per 1000 Patients
+    (icb_means_merged['ADQ Usage'] / icb_means_merged['List Size']) * 1000
+).round(1)
 
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
@@ -123,10 +129,12 @@ icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Rou
 # Calculate ICB Average Values
 total_actual_cost = icb_means_merged['Actual Cost'].sum()
 total_items = icb_means_merged['Items'].sum()
+total_adq = icb_means_merged['ADQ Usage'].sum()
 total_list_size = icb_means_merged['List Size'].sum()
 
 icb_average_spend = (total_actual_cost / total_list_size) * 1000  # Spend per 1000 Patients
 icb_average_items = (total_items / total_list_size) * 1000  # Items per 1000 Patients
+icb_average_adq = (total_adq / total_list_size) * 1000  # ADQ per 1000 Patients
 
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
@@ -138,16 +146,20 @@ icb_data_raw_merged['Spend per 1000 Patients'] = ((icb_data_raw_merged['Actual C
 national_data_raw_merged['Spend per 1000 Patients'] = ((national_data_raw_merged['Actual Cost'] / national_data_raw_merged['List Size']) * 1000).round(1)
 icb_data_raw_merged['Items per 1000 Patients'] = ((icb_data_raw_merged['Items'] / icb_data_raw_merged['List Size']) * 1000).round(1)
 national_data_raw_merged['Items per 1000 Patients'] = ((national_data_raw_merged['Items'] / national_data_raw_merged['List Size']) * 1000).round(1)
+icb_data_raw_merged['ADQ per 1000 Patients'] = ((icb_data_raw_merged['ADQ Usage'] / icb_data_raw_merged['List Size']) * 1000).round(1)
+national_data_raw_merged['ADQ per 1000 Patients'] = ((national_data_raw_merged['ADQ Usage'] / national_data_raw_merged['List Size']) * 1000).round(1)
 
 ### STREAMLIT LAYOUT ------------
 
 # Adjusting chart logic based on 'Select Measure' value
-measure_col = 'Spend per 1000 Patients' if measure_type == 'Spend per 1000 Patients' else 'Items per 1000 Patients'
+measure_col = measure_type
 
-if measure_type == 'Spend per 1000 Patients':
+if measure_type == "Spend per 1000 Patients":
     icb_average_value = icb_average_spend
-else:
+elif measure_type == "Items per 1000 Patients":
     icb_average_value = icb_average_items
+elif measure_type == "ADQ per 1000 Patients":
+    icb_average_value = icb_average_adq
 
 
 # Bar chart ------------
@@ -235,7 +247,8 @@ st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
 # Line Chart ------------
 
-st.header(f"Spend on {dataset_type}: Local Trends")
+st.header(f'{measure_type} on {dataset_type}: Local Trends')
+
 
 col1, col2 = st.columns(2)
 
