@@ -101,7 +101,8 @@ with col1:
             <div style="
                 background-color: #ffc107;
                 color: black;
-                font-size: 1em;
+                font-size: 0.9em;
+                font-weight: bold;
                 padding: 2px 8px;
                 border-radius: 4px;
                 margin-top: 0.3em;
