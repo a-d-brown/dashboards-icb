@@ -85,7 +85,13 @@ def load_data(dataset_type):
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    st.title("NENC Medicines Optimisation Workstream Dashboard")
+    st.markdown("""
+        <h1 style='display: flex; align-items: center; font-size: 3em;'>
+            NENC Medicines Optimisation Workstream Dashboard
+            <span style='background-color: #ffc107; color: black; font-size: 0.5em; margin-left: 12px; padding: 2px 8px; border-radius: 4px;'>BETA</span>
+        </h1>
+    """, unsafe_allow_html=True)
+
 
 with col2:
     dataset_type = st.selectbox(
