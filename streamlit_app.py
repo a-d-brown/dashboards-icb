@@ -112,13 +112,6 @@ with col1:
         </div>
     """, unsafe_allow_html=True)
 
-
-
-
-
-
-
-
 with col2:
     dataset_type = st.selectbox(
         "Select Dataset:",
@@ -129,6 +122,8 @@ with col2:
     # Dynamically assign measure options
     if dataset_type == "Antibacterials":
         measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"]
+    elif dataset_type in ["Lidocaine Patches", "SABAs"]:
+        measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients"]
     else:
         measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"]
 
