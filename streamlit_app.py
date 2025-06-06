@@ -221,33 +221,28 @@ elif measure_type == "DDD per 1000 Patients":
 
 st.header(f'{measure_type} on {dataset_type}: ICB-wide comparison in the last 3m')
 
-# Initialize session state for toggles
-for subloc in sub_location_colors.keys():
-    if f"subloc_toggle_{subloc}" not in st.session_state:
-        st.session_state[f"subloc_toggle_{subloc}"] = True
+# Multiselect for sub-locations
+selected_sublocations = st.multiselect(
+    label="Select sub-locations to display:",
+    options=list(sub_location_colors.keys()),
+    default=list(sub_location_colors.keys()),
+    help="You can select one or more localities to compare"
+)
 
-cols = st.columns(len(sub_location_colors))
-rerun_needed = False
+# Show color legend only for selected sub-locations
+filtered_colors = {k: v for k, v in sub_location_colors.items() if k in selected_sublocations}
 
-for i, (subloc, color) in enumerate(sub_location_colors.items()):
-    with cols[i]:
-        row_1 = st.columns([0.15, 0.5])
-        is_toggled_off = not st.session_state.get(f"subloc_toggle_{subloc}", False)
-        strikethrough_style = "text-decoration: line-through; color: #d3d3d3;" if is_toggled_off else ""
+if filtered_colors:
+    legend_cols = st.columns(len(filtered_colors))
+    for i, (subloc, color) in enumerate(filtered_colors.items()):
+        with legend_cols[i]:
+            st.markdown(
+                f"<div style='display: flex; align-items: center;'>"
+                f"<div style='width: 14px; height: 14px; background-color: {color}; margin-right: 6px; border: 1px solid #00000022;'></div>"
+                f"<span style='font-size: 13px;'>{subloc}</span></div>",
+                unsafe_allow_html=True
+            )
 
-        row_1[0].markdown(f"<div style='width: 16px; height: 16px; background-color: {color}; border-radius: 3px; margin-right: 0px; border: 1px solid #00000033;'></div>", unsafe_allow_html=True)
-        row_1[1].markdown(f"<div title='{subloc}' style='font-weight: bold; font-size: 13px; cursor: default; vertical-align: top; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 12vw; min-width: 60px; {strikethrough_style}'>{subloc}</div>", unsafe_allow_html=True)
-
-        row_2 = st.columns([1])
-        if row_2[0].button("Toggle", key=f"toggle_{subloc}"):
-            st.session_state[f"subloc_toggle_{subloc}"] = not st.session_state.get(f"subloc_toggle_{subloc}", False)
-            rerun_needed = True
-
-if rerun_needed:
-    st.rerun()
-
-# Collect selected sub_locations
-selected_sublocations = [subloc for subloc in sub_location_colors.keys() if st.session_state[f"subloc_toggle_{subloc}"]]
 
 # Filter data based on selected sub_locations
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
@@ -298,6 +293,7 @@ bar_dynamic.add_annotation(
 st.plotly_chart(bar_dynamic, use_container_width=True)
 
 st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
 
 
 # Line Chart ------------
