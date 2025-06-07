@@ -47,39 +47,46 @@ sub_location_colors = {
     'South Tyneside': '#bcbd22'
 }
 
-def format_date_column(df):
+# Preprocessing function
+def preprocess_prescribing_data(df, is_national=False, mapping=None):
+    if not is_national:
+        df = df[df['PCN'] != 'DUMMY']
+        df = df[~df['Practice'].str.contains(r'\( ?[CD] ?\d', na=False)]
+        df['Practice'] = df['Practice'].str.rstrip(',').str.title()
+        df['Commissioner / Provider Code'] = df['Commissioner / Provider Code'].str.slice(0, -2)
+        df['sub_location'] = df['Commissioner / Provider Code'].map(mapping)
+
     df.rename(columns={'Year Month': 'date'}, inplace=True)
     df['date'] = pd.to_datetime(df['date'], format='%Y%m')
     df['formatted_date'] = df['date'].dt.strftime('%b %Y')
+
+    if not is_national:
+        df['date_period'] = df['date'].dt.to_period('M')
+
+    for col in ['ADQ Usage', 'DDD Usage']:
+        if col not in df.columns:
+            df[col] = 0
+
     return df
 
 # Define function to load data based on selected dataset type
 def load_data(dataset_type):
-    if dataset_type == 'SABAs':
-        icb_data_raw = pd.read_csv("__SABAs - ICB Dashboard.csv")
-        national_data_raw = pd.read_csv("__SABAs - ICB Dashboard NATIONAL.csv")
-    elif dataset_type == 'Opioids':
-        icb_data_raw = pd.read_csv("__Opioids - ICB Dashboard.csv")
-        national_data_raw = pd.read_csv("__Opioids - ICB Dashboard NATIONAL.csv")
-    elif dataset_type == 'Lidocaine Patches':
-        icb_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard.csv")
-        national_data_raw = pd.read_csv("__Lidocaine - ICB Dashboard NATIONAL.csv")
-    elif dataset_type == 'Antibacterials':
-        icb_data_raw = pd.read_csv("__Antibacterials - ICB Dashboard.csv")
-        national_data_raw = pd.read_csv("__Antibacterials - ICB Dashboard NATIONAL.csv")
-    
-    # Data preprocessing for selected dataset
-    icb_data_raw = icb_data_raw[icb_data_raw['PCN'] != 'DUMMY']
-    icb_data_raw = icb_data_raw[~icb_data_raw['Practice'].str.contains(r'\( ?[CD] ?\d', na=False)]
-    icb_data_raw['Practice'] = icb_data_raw['Practice'].str.rstrip(',').str.title()
-    icb_data_raw['Commissioner / Provider Code'] = icb_data_raw['Commissioner / Provider Code'].str.slice(0, -2)
-    icb_data_raw['sub_location'] = icb_data_raw['Commissioner / Provider Code'].map(sicbl_legend_mapping)
-    icb_data_raw = format_date_column(icb_data_raw)
-    icb_data_raw['date_period'] = icb_data_raw['date'].dt.to_period('M')
+    file_map = {
+        'SABAs': ("__SABAs - ICB Dashboard.csv", "__SABAs - ICB Dashboard NATIONAL.csv"),
+        'Opioids': ("__Opioids - ICB Dashboard.csv", "__Opioids - ICB Dashboard NATIONAL.csv"),
+        'Lidocaine Patches': ("__Lidocaine - ICB Dashboard.csv", "__Lidocaine - ICB Dashboard NATIONAL.csv"),
+        'Antibacterials': ("__Antibacterials - ICB Dashboard.csv", "__Antibacterials - ICB Dashboard NATIONAL.csv")
+    }
 
-    national_data_raw = format_date_column(national_data_raw)
+    icb_path, national_path = file_map[dataset_type]
+    icb_data_raw = pd.read_csv(icb_path)
+    national_data_raw = pd.read_csv(national_path)
 
-    return icb_data_raw, national_data_raw
+    icb_data_preprocessed = preprocess_prescribing_data(icb_data_raw, is_national=False, mapping=sicbl_legend_mapping)
+    national_data_preprocessed = preprocess_prescribing_data(national_data_raw, is_national=True)
+
+    return icb_data_preprocessed, national_data_preprocessed
+
 
 # Streamlit layout for main title and dropdown side by side
 col1, col2 = st.columns([3, 1])
@@ -130,24 +137,17 @@ with col2:
     measure_type = st.selectbox("Select Measure:", options=measure_options, key="measure_selector")
 
 # Load data based on the selected dataset
-icb_data_raw, national_data_raw = load_data(dataset_type)
-
-# Ensure missing measure columns default to zero to avoid KeyErrors
-for col in ['ADQ Usage', 'DDD Usage']:
-    if col not in icb_data_raw:
-        icb_data_raw[col] = 0
-    if col not in national_data_raw:
-        national_data_raw[col] = 0
+icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
 # Aggregate data across chemical substances
-summary = icb_data_raw.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
-base_aggregate = icb_data_raw.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
+summary = icb_data_preprocessed.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
+base_aggregate = icb_data_preprocessed.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
 icb_data_raw_merged = pd.merge(base_aggregate, summary, on=['Practice', 'date_period'])
 icb_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
 # Aggregate NATIONAL data across chemical substances
-national_summary = national_data_raw.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
-national_base = national_data_raw.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
+national_summary = national_data_preprocessed.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
+national_base = national_data_preprocessed.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
 national_data_raw_merged = pd.merge(national_base, national_summary, on=['date'])
 national_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
