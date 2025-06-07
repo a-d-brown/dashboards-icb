@@ -48,7 +48,7 @@ sub_location_colors = {
 }
 
 # Preprocessing function
-def preprocess_prescribing_data(df, is_national=False, mapping=None):
+def preprocess_prescribing_data(df, is_national, mapping=None):
     if not is_national:
         df = df[df['PCN'] != 'DUMMY']
         df = df[~df['Practice'].str.contains(r'\( ?[CD] ?\d', na=False)]
