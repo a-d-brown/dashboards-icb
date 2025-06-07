@@ -136,7 +136,11 @@ with col2:
 
     # Assign measure options from central map
     measure_options = dataset_measures.get(dataset_type, [])
-    measure_type = st.selectbox("Select Measure:", options=measure_options, key="measure_selector")
+    measure_type = st.selectbox(
+        "Select Measure:",
+        options=measure_options,
+        key="measure_selector"
+    )
 
 
 # Load data based on the selected dataset
@@ -208,8 +212,6 @@ national_data_raw_merged['DDD per 1000 Patients'] = ((national_data_raw_merged['
 ### STREAMLIT LAYOUT ------------
 
 # Adjusting chart logic based on 'Select Measure' value
-measure_col = measure_type
-
 if measure_type == "Spend per 1000 Patients":
     icb_average_value = icb_average_spend
 elif measure_type == "Items per 1000 Patients":
@@ -251,21 +253,21 @@ if filtered_colors:
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
 
 # Define function to plot bar chart
-def plot_icb_bar_chart(filtered_data, measure_col, sub_location_colors, icb_average_value, dataset_type):
+def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type):
     import plotly.express as px
     import plotly.graph_objects as go
 
     show_xticks = filtered_data['sub_location'].nunique() == 1
 
     fig = px.bar(
-        filtered_data.sort_values(measure_col, ascending=False),
+        filtered_data.sort_values(measure_type, ascending=False),
         x='Practice',
-        y=measure_col,
+        y=measure_type,
         hover_name='Practice',
         hover_data={
             'sub_location': False,
             'Practice': False,
-            measure_col: True,
+            measure_type: True,
             'Items (monthly average)': True
         },
         color='sub_location',
@@ -276,8 +278,8 @@ def plot_icb_bar_chart(filtered_data, measure_col, sub_location_colors, icb_aver
         height=700,
         width=1150,
         xaxis_title='',
-        yaxis_title=f'{dataset_type} {measure_col}',
-        yaxis_tickprefix="£" if measure_col == 'Spend per 1000 Patients' else "",
+        yaxis_title=f'{dataset_type} {measure_type}',
+        yaxis_tickprefix="£" if measure_type == 'Spend per 1000 Patients' else "",
         legend_title_text=None,
         xaxis=dict(showticklabels=(len(filtered_data['sub_location'].unique()) == 1), showgrid=False, tickangle=45, tickfont=dict(size=10)),
         yaxis=dict(showgrid=False),
@@ -308,7 +310,7 @@ def plot_icb_bar_chart(filtered_data, measure_col, sub_location_colors, icb_aver
 # Render the bar chart
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,
-    measure_col=measure_col,
+    measure_type=measure_type,
     sub_location_colors=filtered_colors,
     icb_average_value=icb_average_value,
     dataset_type=dataset_type
@@ -338,13 +340,13 @@ with col2:
 # Define function to plot line chart
 def plot_line_chart(sub_location, selected_practice):
     selected_data = icb_data_raw_merged[(icb_data_raw_merged['sub_location'] == sub_location) & (icb_data_raw_merged['Practice'] == selected_practice)]
-    selected_data = selected_data.groupby('date', as_index=False).agg({measure_col: 'sum'})
+    selected_data = selected_data.groupby('date', as_index=False).agg({measure_type: 'sum'})
     selected_data['formatted_date'] = selected_data['date'].dt.strftime('%b %Y')
 
     pcn_code_values = icb_data_raw_merged[(icb_data_raw_merged['sub_location'] == sub_location) & (icb_data_raw_merged['Practice'] == selected_practice)]['PCN Code'].dropna().unique()
     pcn_code = pcn_code_values[0]
     pcn_practices = icb_data_raw_merged[(icb_data_raw_merged['PCN Code'] == pcn_code) & (icb_data_raw_merged['Practice'] != selected_practice)]
-    pcn_practices = pcn_practices.groupby(['Practice', 'date'], as_index=False)[measure_col].sum()
+    pcn_practices = pcn_practices.groupby(['Practice', 'date'], as_index=False)[measure_type].sum()
 
     national_data = national_data_raw_merged[national_data_raw_merged['Country'] == 'ENGLAND']
 
@@ -354,7 +356,7 @@ def plot_line_chart(sub_location, selected_practice):
         data = pcn_practices[pcn_practices['Practice'] == pcn_practice]
         fig.add_trace(go.Scatter(
             x=data['date'],
-            y=data[measure_col],
+            y=data[measure_type],
             mode='lines',
             line=dict(color='rgba(255, 99, 132, 0.2)', width=1),
             name=f"{pcn_practice} (same PCN)",
@@ -368,7 +370,7 @@ def plot_line_chart(sub_location, selected_practice):
 
     fig.add_trace(go.Scatter(
         x=selected_data['date'],
-        y=selected_data[measure_col],
+        y=selected_data[measure_type],
         mode='lines',
         line=dict(color='firebrick', width=2),
         customdata=selected_data['formatted_date'],
@@ -383,7 +385,7 @@ def plot_line_chart(sub_location, selected_practice):
 
     fig.add_trace(go.Scatter(
         x=national_data['date'],
-        y=national_data[measure_col],
+        y=national_data[measure_type],
         mode='lines',
         name='National Average',
         customdata=national_data['formatted_date'],
@@ -397,7 +399,7 @@ def plot_line_chart(sub_location, selected_practice):
     ))
 
     last_date = selected_data['date'].max()
-    last_value = selected_data[selected_data['date'] == last_date][measure_col].values[0]
+    last_value = selected_data[selected_data['date'] == last_date][measure_type].values[0]
 
     fig.add_annotation(
         x=last_date,
@@ -420,7 +422,7 @@ def plot_line_chart(sub_location, selected_practice):
     )
 
     last_nat_date = national_data['date'].max()
-    last_nat_value = national_data[national_data['date'] == last_nat_date][measure_col].values[0]
+    last_nat_value = national_data[national_data['date'] == last_nat_date][measure_type].values[0]
 
     fig.add_annotation(
         x=last_nat_date,
