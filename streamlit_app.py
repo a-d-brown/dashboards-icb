@@ -47,6 +47,14 @@ sub_location_colors = {
     'South Tyneside': '#bcbd22'
 }
 
+# Define available measures per dataset
+dataset_measures = {
+    "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Opioids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
+    "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"]
+}
+
 # Preprocessing function
 def preprocess_prescribing_data(df, is_national, mapping=None):
     if not is_national:
@@ -122,19 +130,14 @@ with col1:
 with col2:
     dataset_type = st.selectbox(
         "Select Dataset:",
-        options=["SABAs", "Opioids", "Lidocaine Patches", "Antibacterials"],
+        options=list(dataset_measures.keys()),
         key="data_type_selector"
     )
 
-    # Dynamically assign measure options
-    if dataset_type == "Antibacterials":
-        measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"]
-    elif dataset_type in ["Lidocaine Patches", "SABAs"]:
-        measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients"]
-    else:
-        measure_options = ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"]
-
+    # Assign measure options from central map
+    measure_options = dataset_measures.get(dataset_type, [])
     measure_type = st.selectbox("Select Measure:", options=measure_options, key="measure_selector")
+
 
 # Load data based on the selected dataset
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
