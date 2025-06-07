@@ -246,51 +246,71 @@ if filtered_colors:
 
 # Filter data based on selected sub_locations
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
-show_xticks = len(selected_sublocations) == 1
 
-# Create updated bar chart
-bar_dynamic = px.bar(
-    filtered_data.sort_values(measure_col, ascending=False),
-    x='Practice',
-    y=measure_col,
-    hover_name='Practice',
-    hover_data={'sub_location': False, 'Practice': False, measure_col: True, 'Items (monthly average)': True},
-    color='sub_location',
-    color_discrete_map=sub_location_colors,
-)
+# Define function to plot bar chart
+def plot_icb_bar_chart(filtered_data, measure_col, sub_location_colors, icb_average_value, dataset_type):
+    import plotly.express as px
+    import plotly.graph_objects as go
 
-bar_dynamic.update_layout(
-    height=700,
-    width=1150,
-    xaxis_title='',
-    yaxis_title=f'{dataset_type} {measure_type}',
-    yaxis_tickprefix="£" if measure_type == 'Spend per 1000 Patients' else "",
-    legend_title_text=None,
-    xaxis=dict(showticklabels=show_xticks, showgrid=False, tickangle=45, tickfont=dict(size=10)),
-    yaxis=dict(showgrid=False),
-    legend=dict(orientation="h", yanchor="bottom", y=1, xanchor="center", x=0.5),
-    showlegend=False,
-    margin=dict(r=100)
-)
+    show_xticks = filtered_data['sub_location'].nunique() == 1
 
-bar_dynamic.update_traces(width=0.6)
+    fig = px.bar(
+        filtered_data.sort_values(measure_col, ascending=False),
+        x='Practice',
+        y=measure_col,
+        hover_name='Practice',
+        hover_data={
+            'sub_location': False,
+            'Practice': False,
+            measure_col: True,
+            'Items (monthly average)': True
+        },
+        color='sub_location',
+        color_discrete_map=sub_location_colors,
+    )
 
-bar_dynamic.add_shape(
-    type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
-    line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"
-)
+    fig.update_layout(
+        height=700,
+        width=1150,
+        xaxis_title='',
+        yaxis_title=f'{dataset_type} {measure_col}',
+        yaxis_tickprefix="£" if measure_col == 'Spend per 1000 Patients' else "",
+        legend_title_text=None,
+        xaxis=dict(showticklabels=(len(filtered_data['sub_location'].unique()) == 1), showgrid=False, tickangle=45, tickfont=dict(size=10)),
+        yaxis=dict(showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1, xanchor="center", x=0.5),
+        showlegend=False,
+        margin=dict(r=100)
+    )
 
-bar_dynamic.add_annotation(
-    x=1, y=icb_average_value,
-    text="ICB Average",
-    showarrow=False,
-    font=dict(size=12, color="black"),
-    xref="paper", yref="y",
-    xanchor="left", yanchor="middle"
-)
+    fig.update_traces(width=0.6)
+
+    # Add ICB average line
+    fig.add_shape(
+        type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
+        line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"
+    )
+
+    fig.add_annotation(
+        x=1, y=icb_average_value,
+        text="ICB Average",
+        showarrow=False,
+        font=dict(size=12, color="black"),
+        xref="paper", yref="y",
+        xanchor="left", yanchor="middle"
+    )
+
+    return fig
 
 # Render the bar chart
-st.plotly_chart(bar_dynamic, use_container_width=True)
+bar_fig = plot_icb_bar_chart(
+    filtered_data=filtered_data,
+    measure_col=measure_col,
+    sub_location_colors=filtered_colors,
+    icb_average_value=icb_average_value,
+    dataset_type=dataset_type
+)
+st.plotly_chart(bar_fig, use_container_width=True)
 
 st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
@@ -312,8 +332,8 @@ with col2:
     practice_options = sorted(filtered_practices['Practice'].unique())
     selected_practice = st.selectbox("Select Practice:", options=practice_options)
 
-# Define update_graph function to handle local trends chart
-def update_graph(sub_location, selected_practice):
+# Define function to plot line chart
+def plot_line_chart(sub_location, selected_practice):
     selected_data = icb_data_raw_merged[(icb_data_raw_merged['sub_location'] == sub_location) & (icb_data_raw_merged['Practice'] == selected_practice)]
     selected_data = selected_data.groupby('date', as_index=False).agg({measure_col: 'sum'})
     selected_data['formatted_date'] = selected_data['date'].dt.strftime('%b %Y')
@@ -413,5 +433,5 @@ def update_graph(sub_location, selected_practice):
     return fig
 
 # Render the local trends chart
-line_fig = update_graph(selected_sublocation, selected_practice)
+line_fig = plot_line_chart(selected_sublocation, selected_practice)
 st.plotly_chart(line_fig, use_container_width=True)
