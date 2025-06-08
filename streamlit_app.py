@@ -1,18 +1,14 @@
-# streamlit_app.py
-
+## ── Imports and Config ────────────────────────
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import streamlit as st
 
-# Set minimalist style for Plotly charts
 pio.templates.default = 'simple_white'
-
-# Streamlit Page Config
 st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 
-# Add custom CSS to adjust the font size of dropdowns
+## ── CSS Styling ────────────────────────────────
 st.markdown("""
     <style>
         .stSelectbox div[data-baseweb="select"] {
@@ -22,6 +18,8 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
+## ── Constants: Mappings and Settings ───────────
 
 # Add mapping for local SICBL names
 sicbl_legend_mapping = {
@@ -55,7 +53,9 @@ dataset_measures = {
     "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"]
 }
 
-# Preprocessing function
+## ── Functions: Preprocessing and Loading ───────
+
+# Preprocess data to standardised format
 def preprocess_prescribing_data(df, is_national, mapping=None):
     if not is_national:
         df = df[df['PCN'] != 'DUMMY']
@@ -77,7 +77,7 @@ def preprocess_prescribing_data(df, is_national, mapping=None):
 
     return df
 
-# Define function to load data based on selected dataset type
+# Load data based on selected dataset type
 @st.cache_data
 def load_data(dataset_type):
     file_map = {
@@ -97,8 +97,9 @@ def load_data(dataset_type):
     return icb_data_preprocessed, national_data_preprocessed
 
 
-# Streamlit layout for main title and dropdown side by side
-col1, col2 = st.columns([3, 1])
+## ── UI: Header and Select Boxes ────────────────
+
+col1, col2 = st.columns([3, 1]) # two column layout
 
 with col1:
     st.markdown("""
@@ -144,16 +145,18 @@ with col2:
     )
 
 
-# Load data based on the selected dataset
+## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
-# Aggregate data across chemical substances
+## ── Aggregation and Measure Calculation ─────────
+
+# Aggregate ICB data across chemical substances
 summary = icb_data_preprocessed.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
 base_aggregate = icb_data_preprocessed.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
 icb_data_raw_merged = pd.merge(base_aggregate, summary, on=['Practice', 'date_period'])
 icb_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
-# Aggregate NATIONAL data across chemical substances
+# Aggregate National data across chemical substances
 national_summary = national_data_preprocessed.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
 national_base = national_data_preprocessed.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
 national_data_raw_merged = pd.merge(national_base, national_summary, on=['date'])
@@ -182,7 +185,7 @@ icb_means_merged['DDD per 1000 Patients'] = (         # Calculate Items per 1000
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
 
-# Calculate ICB Average Values
+# Calculate all possible ICB Average Values
 total_actual_cost = icb_means_merged['Actual Cost'].sum()
 total_items = icb_means_merged['Items'].sum()
 total_adq = icb_means_merged['ADQ Usage'].sum()
@@ -194,11 +197,20 @@ icb_average_items = (total_items / total_list_size) * 1000  # Items per 1000 Pat
 icb_average_adq = (total_adq / total_list_size) * 1000  # ADQ per 1000 Patients
 icb_average_ddd = (total_ddd / total_list_size) * 1000  # DDD per 1000 Patients
 
-
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
+# Set ICB average value ot show based on 'Select Measure' value
+if measure_type == "Spend per 1000 Patients":
+    icb_average_value = icb_average_spend
+elif measure_type == "Items per 1000 Patients":
+    icb_average_value = icb_average_items
+elif measure_type == "ADQ per 1000 Patients":
+    icb_average_value = icb_average_adq
+elif measure_type == "DDD per 1000 Patients":
+    icb_average_value = icb_average_ddd
 
-# Line Chart ------------
+
+# ── Line chart: Calculate Monthly Rate Columns ──────────
 
 # Calculate monthly rates
 icb_data_raw_merged['Spend per 1000 Patients'] = ((icb_data_raw_merged['Actual Cost'] / icb_data_raw_merged['List Size']) * 1000).round(1)
@@ -210,20 +222,10 @@ national_data_raw_merged['ADQ per 1000 Patients'] = ((national_data_raw_merged['
 icb_data_raw_merged['DDD per 1000 Patients'] = ((icb_data_raw_merged['DDD Usage'] / icb_data_raw_merged['List Size']) * 1000).round(1)
 national_data_raw_merged['DDD per 1000 Patients'] = ((national_data_raw_merged['DDD Usage'] / national_data_raw_merged['List Size']) * 1000).round(1)
 
+
 ### STREAMLIT LAYOUT ------------
 
-# Adjusting chart logic based on 'Select Measure' value
-if measure_type == "Spend per 1000 Patients":
-    icb_average_value = icb_average_spend
-elif measure_type == "Items per 1000 Patients":
-    icb_average_value = icb_average_items
-elif measure_type == "ADQ per 1000 Patients":
-    icb_average_value = icb_average_adq
-elif measure_type == "DDD per 1000 Patients":
-    icb_average_value = icb_average_ddd
-
-
-# Bar chart ------------
+# ── Bar Chart ──────────────────────────
 
 st.header(f'{measure_type} on {dataset_type}: ICB-wide comparison in the last 3m')
 
@@ -322,7 +324,7 @@ st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
 
 
-# Line Chart ------------
+# ── Line Chart Section ─────────────────────────
 
 st.header(f'{measure_type} on {dataset_type}: Local Trends')
 
