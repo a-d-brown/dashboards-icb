@@ -78,6 +78,7 @@ def preprocess_prescribing_data(df, is_national, mapping=None):
     return df
 
 # Define function to load data based on selected dataset type
+@st.cache_data
 def load_data(dataset_type):
     file_map = {
         'SABAs': ("__SABAs - ICB Dashboard.csv", "__SABAs - ICB Dashboard NATIONAL.csv"),
