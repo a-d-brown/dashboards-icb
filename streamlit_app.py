@@ -228,20 +228,43 @@ national_data_raw_merged['DDD per 1000 Patients'] = ((national_data_raw_merged['
 
 # ── Bar Chart ──────────────────────────
 
+# ── Bar Chart Section ─────────────────────────────
+
 st.header(f'{measure_type} on {dataset_type}: ICB-wide comparison in the last 3m')
 
-# Multiselect for sub-locations
-selected_sublocations = st.multiselect(
-    label="Select sub-locations to display:",
-    options=list(sub_location_colors.keys()),
-    default=list(sub_location_colors.keys()),
-    help="You can select one or more localities to compare"
-)
+# Two-column layout for sublocation and practice selector
+col1, col2 = st.columns([2, 2])
 
-# Show color legend only for selected sub-locations
+# ── Sub-location Dropdown (col1)
+with col1:
+    subloc_options = ["Show all"] + list(sub_location_colors.keys())
+    selected_subloc_option = st.selectbox(
+        "Select Sub-location:",
+        options=subloc_options
+    )
+
+# Convert selection to a list for filtering
+if selected_subloc_option == "Show all":
+    selected_sublocations = list(sub_location_colors.keys())
+else:
+    selected_sublocations = [selected_subloc_option]
+
+# Filter data
+filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
+
+# ── Conditional Practice Dropdown (col2)
+highlighted_practice = None
+with col2:
+    if len(selected_sublocations) == 1:
+        practices = filtered_data['Practice'].sort_values().unique()
+        selected_practice_option = st.selectbox("Highlight a practice (optional):", ["None"] + list(practices))
+        if selected_practice_option != "None":
+            highlighted_practice = selected_practice_option
+
+# ── Legend (only when multiple sublocations)
 filtered_colors = {k: v for k, v in sub_location_colors.items() if k in selected_sublocations}
 
-if filtered_colors:
+if len(selected_sublocations) > 1 and filtered_colors:
     legend_cols = st.columns(len(filtered_colors))
     for i, (subloc, color) in enumerate(filtered_colors.items()):
         with legend_cols[i]:
@@ -252,18 +275,18 @@ if filtered_colors:
                 unsafe_allow_html=True
             )
 
-# Filter data based on selected sub_locations
-filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
+# ── Bar Chart Plotting ───────────────────────────
 
-# Render the bar chart
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,
     measure_type=measure_type,
-    sub_location_colors=filtered_colors,
+    sub_location_colors=sub_location_colors,
     icb_average_value=icb_average_value,
-    dataset_type=dataset_type
+    dataset_type=dataset_type,
+    highlighted_practice=highlighted_practice  # new param
 )
 st.plotly_chart(bar_fig, use_container_width=True)
+
 
 
 # ── Line Chart ─────────────────────────

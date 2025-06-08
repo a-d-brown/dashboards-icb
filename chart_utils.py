@@ -3,24 +3,42 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Define function to plot bar chart
-def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type):
+import plotly.express as px
+
+import plotly.express as px
+
+def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, highlighted_practice=None):
     show_xticks = filtered_data['sub_location'].nunique() == 1
+    filtered_data = filtered_data.sort_values(measure_type, ascending=False)
 
     fig = px.bar(
-        filtered_data.sort_values(measure_type, ascending=False),
+        filtered_data,
         x='Practice',
         y=measure_type,
         hover_name='Practice',
         hover_data={
             'sub_location': False,
             'Practice': False,
+            'PCN': True,
             measure_type: True,
             'Items (monthly average)': True
         },
         color='sub_location',
-        color_discrete_map=sub_location_colors,
+        color_discrete_map=sub_location_colors
     )
 
+    # Highlight logic
+    if highlighted_practice:
+        # Get the PCN for the selected practice
+        try:
+            target_pcn = filtered_data[filtered_data['Practice'] == highlighted_practice]['PCN'].values[0]
+        except IndexError:
+            target_pcn = None
+
+        # Loop over bars and recolour them
+        fig.for_each_trace(lambda trace: _recolor_bars(trace, filtered_data, highlighted_practice, target_pcn, sub_location_colors))
+
+    # Layout and styling
     fig.update_layout(
         height=700,
         width=1150,
@@ -28,16 +46,16 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
         yaxis_title=f'{dataset_type} {measure_type}',
         yaxis_tickprefix="£" if measure_type == 'Spend per 1000 Patients' else "",
         legend_title_text=None,
-        xaxis=dict(showticklabels=(len(filtered_data['sub_location'].unique()) == 1), showgrid=False, tickangle=45, tickfont=dict(size=10)),
+        xaxis=dict(showticklabels=show_xticks, showgrid=False, tickangle=45, tickfont=dict(size=10)),
         yaxis=dict(showgrid=False),
         legend=dict(orientation="h", yanchor="bottom", y=1, xanchor="center", x=0.5),
-        showlegend=False,
-        margin=dict(r=100)
+        margin=dict(r=100),
+        showlegend=False
     )
 
     fig.update_traces(width=0.6)
 
-    # Add ICB average line
+    # ICB average reference line
     fig.add_shape(
         type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
         line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"
@@ -53,6 +71,38 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
     )
 
     return fig
+
+
+# 🔧 Simple helper used *inside* the main function
+def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colors):
+    if 'x' in trace and hasattr(trace.marker, 'color'):
+        current_colors = list(trace.marker.color) if isinstance(trace.marker.color, list) else [trace.marker.color] * len(trace.x)
+        new_colors = []
+
+        for i, practice in enumerate(trace.x):
+            if practice == highlighted_practice:
+                new_colors.append('#FF2D55')  # neon pink
+            elif target_pcn and df[df['Practice'] == practice]['PCN'].values[0] == target_pcn:
+                new_colors.append('#FFB3C6')  # neon aquamarine
+            else:
+                new_colors.append('#DDDDDD')  # light grey for all others
+
+        trace.marker.color = new_colors
+
+
+
+
+# Utility function to recolour the bar for the highlighted practice
+def _highlight_practice_bar(trace, highlighted_practice, highlight_color):
+    if 'x' in trace and 'marker' in trace:
+        if hasattr(trace, 'x') and hasattr(trace.marker, 'color'):
+            new_colors = list(trace.marker.color) if isinstance(trace.marker.color, list) else [trace.marker.color] * len(trace.x)
+            for i, practice in enumerate(trace.x):
+                if practice == highlighted_practice:
+                    new_colors[i] = highlight_color
+            trace.marker.color = new_colors
+
+
 
 
 # Define function to plot line chart
@@ -84,7 +134,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
             x=data['date'],
             y=data[measure_type],
             mode='lines',
-            line=dict(color='rgba(255, 99, 132, 0.2)', width=1),
+            line=dict(color='#FFD0DC', width=1),
             name=f"{pcn_practice} (same PCN)",
             hovertemplate=(
                 pcn_practice + '<br>' +
@@ -98,7 +148,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
         x=selected_data['date'],
         y=selected_data[measure_type],
         mode='lines',
-        line=dict(color='firebrick', width=2),
+        line=dict(color='#FF2D55', width=2),
         customdata=selected_data['formatted_date'],
         name=f"{selected_practice}",
         hovertemplate=(
@@ -120,7 +170,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
             'Value: %{y:.1f}<br>' +
             'Time Period: %{customdata}<extra></extra>'
         ),
-        line=dict(color='#2A6FBA', width=2),
+        line=dict(color='#4A90E2', width=2),
         showlegend=False
     ))
 
