@@ -3,10 +3,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Define function to plot bar chart
-import plotly.express as px
-
-import plotly.express as px
-
 def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, highlighted_practice=None):
     show_xticks = filtered_data['sub_location'].nunique() == 1
     filtered_data = filtered_data.sort_values(measure_type, ascending=False)
@@ -72,8 +68,7 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
 
     return fig
 
-
-# 🔧 Simple helper used *inside* the main function
+# Helper function used inside the bar chart main function
 def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colors):
     if 'x' in trace and hasattr(trace.marker, 'color'):
         current_colors = list(trace.marker.color) if isinstance(trace.marker.color, list) else [trace.marker.color] * len(trace.x)
@@ -88,21 +83,6 @@ def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colo
                 new_colors.append('#DDDDDD')  # light grey for all others
 
         trace.marker.color = new_colors
-
-
-
-
-# Utility function to recolour the bar for the highlighted practice
-def _highlight_practice_bar(trace, highlighted_practice, highlight_color):
-    if 'x' in trace and 'marker' in trace:
-        if hasattr(trace, 'x') and hasattr(trace.marker, 'color'):
-            new_colors = list(trace.marker.color) if isinstance(trace.marker.color, list) else [trace.marker.color] * len(trace.x)
-            for i, practice in enumerate(trace.x):
-                if practice == highlighted_practice:
-                    new_colors[i] = highlight_color
-            trace.marker.color = new_colors
-
-
 
 
 # Define function to plot line chart
