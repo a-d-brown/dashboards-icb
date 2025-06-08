@@ -24,26 +24,26 @@ st.markdown("""
 
 # Add mapping for local SICBL names
 sicbl_legend_mapping = {
-    '84H': 'Durham',
-    '00P': 'Sunderland',
-    '00L': 'Northumberland',
     '01H': 'Cumbria',
+    '84H': 'Durham',
     '13T': 'Newcastle-Gateshead',
-    '16C': 'Tees Valley',
     '99C': 'North Tyneside',
-    '00N': 'South Tyneside'
+    '00L': 'Northumberland',
+    '00N': 'South Tyneside',
+    '00P': 'Sunderland',
+    '16C': 'Tees Valley'
 }
 
 # Define fixed colors for sub_locations
 sub_location_colors = {
-    'Durham': '#1f77b4',
-    'Sunderland': '#d62728',
-    'Northumberland': '#2ca02c',
     'Cumbria': '#9467bd',
+    'Durham': '#1f77b4',
     'Newcastle-Gateshead': '#ff7f0e',
-    'Tees Valley': '#17becf',
     'North Tyneside': '#e377c2',
-    'South Tyneside': '#bcbd22'
+    'Northumberland': '#2ca02c',
+    'South Tyneside': '#bcbd22',
+    'Sunderland': '#d62728',
+    'Tees Valley': '#17becf'
 }
 
 # Define available measures per dataset
