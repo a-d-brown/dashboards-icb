@@ -226,8 +226,6 @@ national_data_raw_merged['DDD per 1000 Patients'] = ((national_data_raw_merged['
 
 ### STREAMLIT LAYOUT ------------
 
-# ── Bar Chart ──────────────────────────
-
 # ── Bar Chart Section ─────────────────────────────
 
 st.header(f'{measure_type} on {dataset_type}: ICB-wide comparison in the last 3m')
@@ -275,7 +273,7 @@ if len(selected_sublocations) > 1 and filtered_colors:
                 unsafe_allow_html=True
             )
 
-# ── Bar Chart Plotting ───────────────────────────
+# Render Bar Chart
 
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,
@@ -287,9 +285,11 @@ bar_fig = plot_icb_bar_chart(
 )
 st.plotly_chart(bar_fig, use_container_width=True)
 
+st.markdown("---")
 
 
-# ── Line Chart ─────────────────────────
+
+# ── Line Chart Section ─────────────────────────
 
 st.header(f'{measure_type} on {dataset_type}: Local Trends')
 
@@ -304,7 +304,7 @@ with col2:
     practice_options = sorted(filtered_practices['Practice'].unique())
     selected_practice = st.selectbox("Select Practice:", options=practice_options)
 
-# Render the local trends chart
+# Render Line Chart
 line_fig = plot_line_chart(
     icb_data_raw_merged,
     national_data_raw_merged,
