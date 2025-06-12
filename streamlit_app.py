@@ -51,7 +51,8 @@ dataset_measures = {
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Opioids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
-    "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"]
+    "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"],
+    "Closed Triple Inhalers": ["Spend per 1000 Patients", "Items per 1000 Patients"]
 }
 
 ## ── Functions: Preprocessing and Loading ───────
@@ -85,7 +86,9 @@ def load_data(dataset_type):
         'SABAs': ("__SABAs - ICB Dashboard.csv", "__SABAs - ICB Dashboard NATIONAL.csv"),
         'Opioids': ("__Opioids - ICB Dashboard.csv", "__Opioids - ICB Dashboard NATIONAL.csv"),
         'Lidocaine Patches': ("__Lidocaine - ICB Dashboard.csv", "__Lidocaine - ICB Dashboard NATIONAL.csv"),
-        'Antibacterials': ("__Antibacterials - ICB Dashboard.csv", "__Antibacterials - ICB Dashboard NATIONAL.csv")
+        'Antibacterials': ("__Antibacterials - ICB Dashboard.csv", "__Antibacterials - ICB Dashboard NATIONAL.csv"),
+        'Closed Triple Inhalers': ("__Triple Inhalers - ICB Dashboard.csv", "__Triple Inhalers - ICB Dashboard NATIONAL.csv")
+
     }
 
     icb_path, national_path = file_map[dataset_type]
