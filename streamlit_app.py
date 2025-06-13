@@ -92,6 +92,14 @@ def preprocess_prescribing_data(df, is_national, mapping=None):
 
     return df
 
+# Aggregate prescribing data to Chemical level based on a certain index
+def aggregate_substance_data(df, group_cols):
+    summary = df.groupby(group_cols, as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
+    base = df.drop_duplicates(subset=group_cols).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
+    merged = pd.merge(base, summary, on=group_cols)
+    merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
+    return merged
+
 # Load data based on selected dataset type
 @st.cache_data
 def load_data(dataset_type):
@@ -185,17 +193,11 @@ if measure_type in ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patient
 
 ## ── Aggregation and Measure Calculation ─────────
 
-# Aggregate ICB data across chemical substances
-summary = icb_data_preprocessed.groupby(['Practice', 'date_period'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
-base_aggregate = icb_data_preprocessed.drop_duplicates(subset=['Practice', 'date_period']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
-icb_data_raw_merged = pd.merge(base_aggregate, summary, on=['Practice', 'date_period'])
-icb_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
 
-# Aggregate National data across chemical substances
-national_summary = national_data_preprocessed.groupby(['date'], as_index=False)[['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage']].sum().round(1)
-national_base = national_data_preprocessed.drop_duplicates(subset=['date']).drop(columns=['Items', 'Actual Cost', 'ADQ Usage', 'DDD Usage', 'BNF Chemical Substance plus Code'])
-national_data_raw_merged = pd.merge(national_base, national_summary, on=['date'])
-national_data_raw_merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
+# Apply aggregation function
+icb_data_raw_merged = aggregate_substance_data(icb_data_preprocessed, ['Practice', 'date_period']) # indexed by both practice and date_period. date period helps standardise grouping for bar chart.
+national_data_raw_merged = aggregate_substance_data(national_data_preprocessed, ['date']) # only date index needed as one-dimensional data. plotly expects datetime[ns64] for line chart.
+
 
 # Calculate mean spend and items in last 3m
 recent_data = icb_data_raw_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
@@ -203,13 +205,11 @@ means = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List
 base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'COPD List Size','Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']) # Create metadata base
 icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
-
 # Decide which denominator column to use
 if measure_type in ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]:
     denominator_column = "COPD List Size"
 else:
     denominator_column = "List Size"
-
 
 # Calculate 3m mean rates
 icb_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
@@ -227,20 +227,20 @@ icb_means_merged['DDD per 1000 Patients'] = (         # Calculate Items per 1000
 
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
+icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
 # Calculate all possible ICB Average Values
-total_actual_cost = icb_means_merged['Actual Cost'].sum()
-total_items = icb_means_merged['Items'].sum()
-total_adq = icb_means_merged['ADQ Usage'].sum()
-total_ddd = icb_means_merged['DDD Usage'].sum()
-total_list_size = icb_means_merged[denominator_column].sum()
+total_actual_cost = recent_data['Actual Cost'].sum()
+total_items = recent_data['Items'].sum()
+total_adq = recent_data['ADQ Usage'].sum()
+total_ddd = recent_data['DDD Usage'].sum()
+total_list_size = recent_data[denominator_column].sum()
 
 icb_average_spend = (total_actual_cost / total_list_size) * 1000  # Spend per 1000 Patients
 icb_average_items = (total_items / total_list_size) * 1000  # Items per 1000 Patients
 icb_average_adq = (total_adq / total_list_size) * 1000  # ADQ per 1000 Patients
 icb_average_ddd = (total_ddd / total_list_size) * 1000  # DDD per 1000 Patients
 
-icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
 # Set ICB average value ot show based on 'Select Measure' value
 if measure_type == "Spend per 1000 Patients":
@@ -341,6 +341,8 @@ if len(selected_sublocations) > 1 and filtered_colors:
 measure_column = measure_column_lookup.get(measure_type)
 
 # Render Bar Chart
+st.subheader("🔍 Preview of Bar Chart Data")
+st.dataframe(filtered_data[['Practice', 'sub_location', measure_column, 'Items (monthly average)']].sort_values(by=measure_column, ascending=False).head(10))
 
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,

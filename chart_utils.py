@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 
 # Define function to plot bar chart
 def plot_icb_bar_chart(filtered_data, measure_type, measure_column, sub_location_colors, icb_average_value, dataset_type, highlighted_practice=None):
+
     show_xticks = filtered_data['sub_location'].nunique() == 1
 
     filtered_data = filtered_data.sort_values(measure_column, ascending=False)
@@ -22,12 +23,17 @@ def plot_icb_bar_chart(filtered_data, measure_type, measure_column, sub_location
     prefix = "£" if "Spend" in measure_type else ""
 
     # Add formatted hovertemplate
-    fig.update_traces(
-        width=0.6,
-        hovertemplate=
-            f"<b>%{{x}}</b><br>{measure_type}: {prefix}%{{y:.1f}}<br>Items (monthly average): %{{customdata[0]:.0f}}<extra></extra>",
-        customdata=filtered_data[["Items (monthly average)"]].to_numpy()
-    )
+    for trace in fig.data:
+        subloc = trace.name
+        subloc_data = filtered_data[filtered_data['sub_location'] == subloc]
+
+        trace.customdata = subloc_data[["Items (monthly average)"]].to_numpy()
+        trace.hovertemplate = (
+            f"<b>%{{x}}</b><br>{measure_type}: {prefix}%{{y:.1f}}<br>"
+            "Items (monthly average): %{customdata[0]:.0f}<extra></extra>"
+        )
+        trace.width = 0.6
+
 
     # Highlight logic
     if highlighted_practice:
