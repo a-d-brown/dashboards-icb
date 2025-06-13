@@ -59,29 +59,36 @@ dataset_measures = {
 measure_metadata = {
     "Spend per 1000 Patients": {
         "denominator_column": "List Size",
-        "numerator_column": "Actual Cost"
+        "numerator_column": "Actual Cost",
+        "prefix": "£"
     },
     "Items per 1000 Patients": {
         "denominator_column": "List Size",
-        "numerator_column": "Items"
+        "numerator_column": "Items",
+        "prefix": ""
     },
     "ADQ per 1000 Patients": {
         "denominator_column": "List Size",
-        "numerator_column": "ADQ Usage"
+        "numerator_column": "ADQ Usage",
+        "prefix": ""
     },
     "DDD per 1000 Patients": {
         "denominator_column": "List Size",
-        "numerator_column": "DDD Usage"
+        "numerator_column": "DDD Usage",
+        "prefix": ""
     },
     "Spend per 1000 COPD Patients": {
         "denominator_column": "COPD List Size",
-        "numerator_column": "Actual Cost"
+        "numerator_column": "Actual Cost",
+        "prefix": "£"
     },
     "Items per 1000 COPD Patients": {
         "denominator_column": "COPD List Size",
-        "numerator_column": "Items"
+        "numerator_column": "Items",
+        "prefix": ""
     }
 }
+
 
 NATIONAL_COPD_LIST_SIZE = 1175163
 
@@ -313,6 +320,7 @@ bar_fig = plot_icb_bar_chart(
     sub_location_colors=sub_location_colors,
     icb_average_value=icb_average_value,
     dataset_type=dataset_type,
+    measure_metadata=measure_metadata,
     highlighted_practice=highlighted_practice
 )
 

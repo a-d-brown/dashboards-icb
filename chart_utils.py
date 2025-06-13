@@ -3,7 +3,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Define function to plot bar chart
-def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, highlighted_practice=None):
+def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, measure_metadata, highlighted_practice=None):
 
     show_xticks = filtered_data['sub_location'].nunique() == 1
 
@@ -20,7 +20,7 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
     )
 
     # Determine whether to add £ prefix
-    prefix = "£" if "Spend" in measure_type else ""
+    prefix = measure_metadata[measure_type].get("prefix", "")
 
     # Add formatted hovertemplate
     for trace in fig.data:
