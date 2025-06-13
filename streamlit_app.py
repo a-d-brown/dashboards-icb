@@ -139,7 +139,8 @@ def load_data(dataset_type):
     return icb_data_preprocessed, national_data_preprocessed
 
 # Load COPD list size data
-copd_list_size_df = pd.read_csv("copd_patients_23_24.csv")
+copd_list_size_df = pd.read_csv("copd_register_may25.csv") # this file 
+copd_list_size_df['Practice'] = copd_list_size_df['Practice'].str.title()
 copd_list_size_df = copd_list_size_df[['Practice', 'COPD Register']]
 copd_list_size_df.rename(columns={'COPD Register': 'COPD List Size'}, inplace=True)
 
