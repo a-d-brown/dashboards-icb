@@ -341,9 +341,6 @@ if len(selected_sublocations) > 1 and filtered_colors:
 measure_column = measure_column_lookup.get(measure_type)
 
 # Render Bar Chart
-st.subheader("🔍 Preview of Bar Chart Data")
-st.dataframe(filtered_data[['Practice', 'sub_location', measure_column, 'Items (monthly average)']].sort_values(by=measure_column, ascending=False).head(10))
-
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,
     measure_type=measure_type,
