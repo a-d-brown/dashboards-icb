@@ -3,18 +3,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Define function to plot bar chart
-def plot_icb_bar_chart(filtered_data, measure_type, measure_column, sub_location_colors, icb_average_value, dataset_type, highlighted_practice=None):
+def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, highlighted_practice=None):
 
     show_xticks = filtered_data['sub_location'].nunique() == 1
 
-    filtered_data = filtered_data.sort_values(measure_column, ascending=False)
+    filtered_data = filtered_data.sort_values(measure_type, ascending=False)
     filtered_data = filtered_data.copy()
-    filtered_data[measure_type] = filtered_data[measure_column]
+    filtered_data[measure_type] = filtered_data[measure_type]
 
     fig = px.bar(
         filtered_data,
         x='Practice',
-        y=measure_column,
+        y=measure_type,
         color='sub_location',
         color_discrete_map=sub_location_colors
     )
@@ -94,12 +94,12 @@ def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colo
 
 
 # Define function to plot line chart
-def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location, selected_practice, measure_type, measure_column, dataset_type):
+def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location, selected_practice, measure_type, dataset_type):
     # Prepare selected practice data
     selected_data = icb_data_raw_merged[
         (icb_data_raw_merged['sub_location'] == sub_location) &
         (icb_data_raw_merged['Practice'] == selected_practice)
-    ].groupby('date', as_index=False).agg({measure_column: 'sum'})
+    ].groupby('date', as_index=False).agg({measure_type: 'sum'})
     selected_data['formatted_date'] = selected_data['date'].dt.strftime('%b %Y')
 
     # Get PCN code for selected practice
@@ -113,7 +113,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     pcn_practices = icb_data_raw_merged[
         (icb_data_raw_merged['PCN Code'] == pcn_code) &
         (icb_data_raw_merged['Practice'] != selected_practice)
-    ].groupby(['Practice', 'date'], as_index=False)[measure_column].sum()
+    ].groupby(['Practice', 'date'], as_index=False)[measure_type].sum()
 
     # National-level data
     national_data = national_data_raw_merged[national_data_raw_merged['Country'] == 'ENGLAND']
@@ -125,7 +125,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
         data = pcn_practices[pcn_practices['Practice'] == pcn_practice]
         fig.add_trace(go.Scatter(
             x=data['date'],
-            y=data[measure_column],
+            y=data[measure_type],
             mode='lines',
             line=dict(color='#FFD0DC', width=1),
             name=f"{pcn_practice} (same PCN)",
@@ -140,7 +140,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     # Plot selected practice
     fig.add_trace(go.Scatter(
         x=selected_data['date'],
-        y=selected_data[measure_column],
+        y=selected_data[measure_type],
         mode='lines',
         line=dict(color='#FF2D55', width=2),
         customdata=selected_data['formatted_date'],
@@ -156,7 +156,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     # Plot national average
     fig.add_trace(go.Scatter(
         x=national_data['date'],
-        y=national_data[measure_column],
+        y=national_data[measure_type],
         mode='lines',
         name='National Average',
         customdata=national_data['formatted_date'],
@@ -171,7 +171,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
 
     # Label last value for selected practice
     last_date = selected_data['date'].max()
-    last_value = selected_data[selected_data['date'] == last_date][measure_column].values[0]
+    last_value = selected_data[selected_data['date'] == last_date][measure_type].values[0]
     fig.add_annotation(
         x=last_date,
         y=last_value,
@@ -185,7 +185,7 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
 
     # Label last national value
     last_nat_date = national_data['date'].max()
-    last_nat_value = national_data[national_data['date'] == last_nat_date][measure_column].values[0]
+    last_nat_value = national_data[national_data['date'] == last_nat_date][measure_type].values[0]
     fig.add_annotation(
         x=last_nat_date,
         y=last_nat_value,

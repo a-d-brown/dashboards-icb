@@ -55,14 +55,32 @@ dataset_measures = {
     "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]
 }
 
-# Define which measure columns should be referred to when each measure type if selected
-measure_column_lookup = {
-    "Spend per 1000 Patients": "Spend per 1000 Patients",
-    "Spend per 1000 COPD Patients": "Spend per 1000 Patients",
-    "Items per 1000 Patients": "Items per 1000 Patients",
-    "Items per 1000 COPD Patients": "Items per 1000 Patients",
-    "ADQ per 1000 Patients": "ADQ per 1000 Patients",
-    "DDD per 1000 Patients": "DDD per 1000 Patients"
+# Measure Metadata ─────────────────────────────
+measure_metadata = {
+    "Spend per 1000 Patients": {
+        "denominator_column": "List Size",
+        "numerator_column": "Actual Cost"
+    },
+    "Items per 1000 Patients": {
+        "denominator_column": "List Size",
+        "numerator_column": "Items"
+    },
+    "ADQ per 1000 Patients": {
+        "denominator_column": "List Size",
+        "numerator_column": "ADQ Usage"
+    },
+    "DDD per 1000 Patients": {
+        "denominator_column": "List Size",
+        "numerator_column": "DDD Usage"
+    },
+    "Spend per 1000 COPD Patients": {
+        "denominator_column": "COPD List Size",
+        "numerator_column": "Actual Cost"
+    },
+    "Items per 1000 COPD Patients": {
+        "denominator_column": "COPD List Size",
+        "numerator_column": "Items"
+    }
 }
 
 NATIONAL_COPD_LIST_SIZE = 1175163
@@ -109,7 +127,6 @@ def load_data(dataset_type):
         'Lidocaine Patches': ("__Lidocaine - ICB Dashboard.csv", "__Lidocaine - ICB Dashboard NATIONAL.csv"),
         'Antibacterials': ("__Antibacterials - ICB Dashboard.csv", "__Antibacterials - ICB Dashboard NATIONAL.csv"),
         'Closed Triple Inhalers': ("__Triple Inhalers - ICB Dashboard.csv", "__Triple Inhalers - ICB Dashboard NATIONAL.csv")
-
     }
 
     icb_path, national_path = file_map[dataset_type]
@@ -186,18 +203,15 @@ icb_data_preprocessed = icb_data_preprocessed.merge(
 )
 
 # Exclude rows with missing COPD List Size if measure requires it
-if measure_type in ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]:
-    icb_data_preprocessed = icb_data_preprocessed[icb_data_preprocessed['COPD List Size'].notna()]
-
+if measure_metadata[measure_type]["denominator_column"] == "COPD List Size":
+    icb_data_preprocessed = icb_data_preprocessed[icb_data_preprocessed["COPD List Size"].notna()]
 
 
 ## ── Aggregation and Measure Calculation ─────────
 
-
 # Apply aggregation function
 icb_data_raw_merged = aggregate_substance_data(icb_data_preprocessed, ['Practice', 'date_period']) # indexed by both practice and date_period. date period helps standardise grouping for bar chart.
 national_data_raw_merged = aggregate_substance_data(national_data_preprocessed, ['date']) # only date index needed as one-dimensional data. plotly expects datetime[ns64] for line chart.
-
 
 # Calculate mean spend and items in last 3m
 recent_data = icb_data_raw_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
@@ -205,87 +219,41 @@ means = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List
 base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'COPD List Size','Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']) # Create metadata base
 icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
-# Decide which denominator column to use
-if measure_type in ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]:
-    denominator_column = "COPD List Size"
-else:
-    denominator_column = "List Size"
+# Decide which numerator and denominator column to use
+numerator_column = measure_metadata[measure_type]["numerator_column"]
+denominator_column = measure_metadata[measure_type]["denominator_column"]
 
 # Calculate 3m mean rates
-icb_means_merged['Spend per 1000 Patients'] = (         # Calculate Spend per 1000 Patients
-    (icb_means_merged['Actual Cost'] / icb_means_merged[denominator_column]) * 1000
-).round(1)
-icb_means_merged['Items per 1000 Patients'] = (         # Calculate Items per 1000 Patients
-    (icb_means_merged['Items'] / icb_means_merged[denominator_column]) * 1000
-).round(1)
-icb_means_merged['ADQ per 1000 Patients'] = (         # Calculate Items per 1000 Patients
-    (icb_means_merged['ADQ Usage'] / icb_means_merged[denominator_column]) * 1000
-).round(1)
-icb_means_merged['DDD per 1000 Patients'] = (         # Calculate Items per 1000 Patients
-    (icb_means_merged['DDD Usage'] / icb_means_merged[denominator_column]) * 1000
+icb_means_merged[measure_type] = (
+    (icb_means_merged[numerator_column] / icb_means_merged[denominator_column]) * 1000
 ).round(1)
 
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
-# Calculate all possible ICB Average Values
-total_actual_cost = recent_data['Actual Cost'].sum()
-total_items = recent_data['Items'].sum()
-total_adq = recent_data['ADQ Usage'].sum()
-total_ddd = recent_data['DDD Usage'].sum()
-total_list_size = recent_data[denominator_column].sum()
-
-icb_average_spend = (total_actual_cost / total_list_size) * 1000  # Spend per 1000 Patients
-icb_average_items = (total_items / total_list_size) * 1000  # Items per 1000 Patients
-icb_average_adq = (total_adq / total_list_size) * 1000  # ADQ per 1000 Patients
-icb_average_ddd = (total_ddd / total_list_size) * 1000  # DDD per 1000 Patients
-
-
-# Set ICB average value ot show based on 'Select Measure' value
-if measure_type == "Spend per 1000 Patients":
-    icb_average_value = icb_average_spend
-elif measure_type == "Items per 1000 Patients":
-    icb_average_value = icb_average_items
-elif measure_type == "ADQ per 1000 Patients":
-    icb_average_value = icb_average_adq
-elif measure_type == "DDD per 1000 Patients":
-    icb_average_value = icb_average_ddd
-elif measure_type == "Spend per 1000 COPD Patients":
-    icb_average_value = icb_average_spend
-elif measure_type == "Items per 1000 COPD Patients":
-    icb_average_value = icb_average_items
+# Calculate ICB Average Values
+total_numerator = recent_data[numerator_column].sum()
+total_denominator = recent_data[denominator_column].sum()
+icb_average_value = (total_numerator / total_denominator) * 1000
 
 
 # ── Line chart: Calculate Monthly Rate Columns ──────────
 
 # Calculate monthly rates for ICB data
-icb_data_raw_merged['Spend per 1000 Patients'] = ((icb_data_raw_merged['Actual Cost'] / icb_data_raw_merged[denominator_column]) * 1000).round(1)
-icb_data_raw_merged['Items per 1000 Patients'] = ((icb_data_raw_merged['Items'] / icb_data_raw_merged[denominator_column]) * 1000).round(1)
-icb_data_raw_merged['ADQ per 1000 Patients'] = ((icb_data_raw_merged['ADQ Usage'] / icb_data_raw_merged[denominator_column]) * 1000).round(1)
-icb_data_raw_merged['DDD per 1000 Patients'] = ((icb_data_raw_merged['DDD Usage'] / icb_data_raw_merged[denominator_column]) * 1000).round(1)
+icb_data_raw_merged[measure_type] = (
+    (icb_data_raw_merged[numerator_column] / icb_data_raw_merged[denominator_column]) * 1000
+).round(1)
 
 # Calculate monthly rates for national data
-if measure_type in ["Spend per 1000 COPD Patients"]:
-    national_data_raw_merged['Spend per 1000 Patients'] = (
-        (national_data_raw_merged['Actual Cost'] / NATIONAL_COPD_LIST_SIZE) * 1000
+if denominator_column == "COPD List Size":
+    national_data_raw_merged[measure_type] = (
+        (national_data_raw_merged[numerator_column] / NATIONAL_COPD_LIST_SIZE) * 1000
     ).round(1)
 else:
-    national_data_raw_merged['Spend per 1000 Patients'] = (
-        (national_data_raw_merged['Actual Cost'] / national_data_raw_merged['List Size']) * 1000
+    national_data_raw_merged[measure_type] = (
+        (national_data_raw_merged[numerator_column] / national_data_raw_merged[denominator_column]) * 1000
     ).round(1)
-
-if measure_type == "Items per 1000 COPD Patients":
-    national_data_raw_merged['Items per 1000 Patients'] = (
-        (national_data_raw_merged['Items'] / NATIONAL_COPD_LIST_SIZE) * 1000
-    ).round(1)
-else:
-    national_data_raw_merged['Items per 1000 Patients'] = (
-        (national_data_raw_merged['Items'] / national_data_raw_merged['List Size']) * 1000
-    ).round(1)
-
-national_data_raw_merged['ADQ per 1000 Patients'] = ((national_data_raw_merged['ADQ Usage'] / national_data_raw_merged['List Size']) * 1000).round(1)
-national_data_raw_merged['DDD per 1000 Patients'] = ((national_data_raw_merged['DDD Usage'] / national_data_raw_merged['List Size']) * 1000).round(1)
 
 
 ### STREAMLIT LAYOUT ------------
@@ -337,14 +305,10 @@ if len(selected_sublocations) > 1 and filtered_colors:
                 unsafe_allow_html=True
             )
 
-# Determine measure column based on selected measure type
-measure_column = measure_column_lookup.get(measure_type)
-
 # Render Bar Chart
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,
     measure_type=measure_type,
-    measure_column=measure_column,
     sub_location_colors=sub_location_colors,
     icb_average_value=icb_average_value,
     dataset_type=dataset_type,
@@ -354,7 +318,6 @@ bar_fig = plot_icb_bar_chart(
 st.plotly_chart(bar_fig, use_container_width=True)
 
 st.markdown("---")
-
 
 
 # ── Line Chart Section ─────────────────────────
@@ -380,7 +343,6 @@ line_fig = plot_line_chart(
     selected_sublocation,
     selected_practice,
     measure_type,
-    measure_column,
     dataset_type
 )
 
