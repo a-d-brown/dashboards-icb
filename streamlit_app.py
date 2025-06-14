@@ -6,6 +6,15 @@ import plotly.io as pio
 import streamlit as st
 from chart_utils import plot_icb_bar_chart, plot_line_chart
 
+query_params = st.query_params
+
+initial_dataset = query_params.get("dataset", "SABAs")
+initial_measure = query_params.get("measure", "Spend per 1000 Patients")
+initial_subloc = query_params.get("sublocation", "Show all")
+initial_highlight = query_params.get("highlight", "None")
+
+
+
 pio.templates.default = 'simple_white'
 st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 
@@ -188,17 +197,25 @@ with col2:
     dataset_type = st.selectbox(
         "Select Dataset:",
         options=list(dataset_measures.keys()),
-        key="data_type_selector"
+        index=list(dataset_measures.keys()).index(initial_dataset)
     )
 
     # Assign measure options from central map
     measure_options = dataset_measures.get(dataset_type, [])
+
+    # If the initial_measure is valid for this dataset, keep it. Otherwise, reset to first option.
+    if initial_measure in measure_options:
+        default_measure_index = measure_options.index(initial_measure)
+        resolved_measure = initial_measure
+    else:
+        default_measure_index = 0
+        resolved_measure = measure_options[0]  # fallback to first valid measure
+
     measure_type = st.selectbox(
         "Select Measure:",
         options=measure_options,
-        key="measure_selector"
+        index=default_measure_index
     )
-
 
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
@@ -264,6 +281,7 @@ else:
     ).round(1)
 
 
+
 ### STREAMLIT LAYOUT ------------
 
 # ── Bar Chart Section ─────────────────────────────
@@ -278,8 +296,11 @@ with col1:
     subloc_options = ["Show all"] + list(sub_location_colors.keys())
     selected_subloc_option = st.selectbox(
         "Select Sub-location:",
-        options=subloc_options
+        options=subloc_options,
+        index=subloc_options.index(initial_subloc) if initial_subloc in subloc_options else 0,
+        key="subloc_selector"
     )
+
 
 # Convert selection to a list for filtering
 if selected_subloc_option == "Show all":
@@ -293,11 +314,20 @@ filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_
 # ── Conditional Practice Dropdown (col2)
 highlighted_practice = None
 with col2:
-    if len(selected_sublocations) == 1:
+    if selected_subloc_option != "Show all":
         practices = filtered_data['Practice'].sort_values().unique()
-        selected_practice_option = st.selectbox("Highlight a practice (optional):", ["None"] + list(practices))
+        practice_options = ["None"] + list(practices)
+        default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
+
+        selected_practice_option = st.selectbox(
+            "Highlight a practice (optional):",
+            options=practice_options,
+            index=default_index
+        )
+
         if selected_practice_option != "None":
             highlighted_practice = selected_practice_option
+
 
 # ── Legend (only when multiple sublocations)
 filtered_colors = {k: v for k, v in sub_location_colors.items() if k in selected_sublocations}
@@ -333,26 +363,38 @@ st.markdown("---")
 
 st.header(f'{measure_type} on {dataset_type}: Local Trends')
 
-col1, col2 = st.columns(2)
+selected_sublocation = selected_subloc_option
+selected_practice = highlighted_practice
 
-with col1:
-    sicbl_options = sorted(icb_data_raw_merged['sub_location'].dropna().unique())
-    selected_sublocation = st.selectbox("Select Sub-location:", options=sicbl_options)
+if selected_practice:
+    line_fig = plot_line_chart(
+        icb_data_raw_merged,
+        national_data_raw_merged,
+        selected_sublocation,
+        selected_practice,
+        measure_type,
+        dataset_type
+    )
+    st.plotly_chart(line_fig, use_container_width=True)
+else:
+    st.info("Select a practice from the bar chart dropdown to view local trends.")
 
-with col2:
-    filtered_practices = icb_data_raw_merged[icb_data_raw_merged['sub_location'] == selected_sublocation]
-    practice_options = sorted(filtered_practices['Practice'].unique())
-    selected_practice = st.selectbox("Select Practice:", options=practice_options)
 
-# Render Line Chart
+# Update deeplinking
+current_params = {
+    "dataset": initial_dataset,
+    "measure": initial_measure,
+    "sublocation": initial_subloc,
+    "highlight": initial_highlight,
+}
 
-line_fig = plot_line_chart(
-    icb_data_raw_merged,
-    national_data_raw_merged,
-    selected_sublocation,
-    selected_practice,
-    measure_type,
-    dataset_type
-)
+new_params = {
+    "dataset": dataset_type,
+    "measure": measure_type,
+    "sublocation": selected_subloc_option,
+    "highlight": highlighted_practice or "None"
+}
 
-st.plotly_chart(line_fig, use_container_width=True)
+if current_params != new_params:
+    st.query_params.update(new_params)
+
