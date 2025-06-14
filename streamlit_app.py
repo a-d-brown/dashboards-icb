@@ -6,19 +6,32 @@ import plotly.io as pio
 import streamlit as st
 from chart_utils import plot_icb_bar_chart, plot_line_chart
 
-query_params = st.query_params
+# Experimental deeplinking
+ENABLE_DEEPLINKING = False
 
-initial_dataset = query_params.get("dataset", "SABAs")
-initial_measure = query_params.get("measure", "Spend per 1000 Patients")
-initial_subloc = query_params.get("sublocation", "Show all")
-initial_highlight = query_params.get("highlight", "None")
+if ENABLE_DEEPLINKING:
+    if "query_updated" not in st.session_state:
+        st.session_state.query_updated = False
+    else:
+        st.session_state.query_updated = False  # Reset flag on each rerun
+
+    query_params = st.query_params
+
+    initial_dataset = query_params.get("dataset", "SABAs")
+    initial_measure = query_params.get("measure", "Spend per 1000 Patients")
+    initial_subloc = query_params.get("sublocation", "Show all")
+    initial_highlight = query_params.get("highlight", "None")
+else:
+    initial_dataset = "SABAs"
+    initial_measure = "Spend per 1000 Patients"
+    initial_subloc = "Show all"
+    initial_highlight = "None"
 
 
-
+## ── Styling ────────────────────────────────
 pio.templates.default = 'simple_white'
 st.set_page_config(page_title="ICB Workstream Dashboard", layout="wide")
 
-## ── CSS Styling ────────────────────────────────
 st.markdown("""
     <style>
         .stSelectbox div[data-baseweb="select"] {
@@ -380,21 +393,25 @@ else:
     st.info("Select a practice from the bar chart dropdown to view local trends.")
 
 
-# Update deeplinking
-current_params = {
-    "dataset": initial_dataset,
-    "measure": initial_measure,
-    "sublocation": initial_subloc,
-    "highlight": initial_highlight,
-}
+if ENABLE_DEEPLINKING:
+    current_params = {
+        "dataset": initial_dataset,
+        "measure": initial_measure,
+        "sublocation": initial_subloc,
+        "highlight": initial_highlight,
+    }
 
-new_params = {
-    "dataset": dataset_type,
-    "measure": measure_type,
-    "sublocation": selected_subloc_option,
-    "highlight": highlighted_practice or "None"
-}
+    new_params = {
+        "dataset": dataset_type,
+        "measure": measure_type,
+        "sublocation": selected_subloc_option,
+        "highlight": highlighted_practice or "None"
+    }
 
-if current_params != new_params:
-    st.query_params.update(new_params)
+    if current_params != new_params and not st.session_state.query_updated:
+        st.query_params.update(new_params)
+        st.session_state.query_updated = True
+
+
+
 
