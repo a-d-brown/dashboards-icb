@@ -379,20 +379,51 @@ st.header(f'{measure_type} on {dataset_type}: Local Trends')
 selected_sublocation = selected_subloc_option
 selected_practice = highlighted_practice
 
+# ── Redisplay Legend Above Line Chart ─────────────────────
+if len(selected_sublocations) > 1 and filtered_colors:
+    legend_cols = st.columns(len(filtered_colors))
+    for i, (subloc, color) in enumerate(filtered_colors.items()):
+        with legend_cols[i]:
+            st.markdown(
+                f"<div style='display: flex; align-items: center;'>"
+                f"<div style='width: 14px; height: 14px; background-color: {color}; margin-right: 6px; border: 1px solid #00000022;'></div>"
+                f"<span style='font-size: 13px;'>{subloc}</span></div>",
+                unsafe_allow_html=True
+            )
+
+
 if selected_practice:
     line_fig = plot_line_chart(
         icb_data_raw_merged,
         national_data_raw_merged,
-        selected_sublocation,
-        selected_practice,
-        measure_type,
-        dataset_type
+        sub_location=selected_subloc_option,
+        selected_subloc_option=selected_subloc_option,
+        selected_practice=selected_practice,
+        measure_type=measure_type,
+        dataset_type=dataset_type,
+        mode="practice"
     )
+
     st.plotly_chart(line_fig, use_container_width=True)
+
 else:
-    st.info("Select a practice from the bar chart dropdown to view local trends.")
+    line_fig = plot_line_chart(
+        icb_data_raw_merged,
+        national_data_raw_merged,
+        sub_location=None,
+        selected_subloc_option=selected_subloc_option,
+        selected_practice=None,
+        measure_type=measure_type,
+        dataset_type=dataset_type,
+        mode="sublocations",
+        sub_location_colors=sub_location_colors
+    )
+
+    st.plotly_chart(line_fig, use_container_width=True)
 
 
+
+# Deeplinking param updates
 if ENABLE_DEEPLINKING:
     current_params = {
         "dataset": initial_dataset,
