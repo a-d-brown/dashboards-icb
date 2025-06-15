@@ -94,7 +94,52 @@ def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colo
 
 
 # Define function to plot line chart
-def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location, selected_practice, measure_type, dataset_type):
+def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location, selected_subloc_option, selected_practice, measure_type, dataset_type, mode="practice", sub_location_colors=None):
+    fig = go.Figure()
+
+    if mode == "sublocations":
+        avg_by_subloc = (
+            icb_data_raw_merged
+            .groupby(['sub_location', 'date'])[measure_type]
+            .mean()
+            .reset_index()
+        )
+
+        unique_sublocs = avg_by_subloc['sub_location'].dropna().unique()
+
+        for subloc in unique_sublocs:
+            subloc_data = avg_by_subloc[avg_by_subloc['sub_location'] == subloc]
+
+            if selected_subloc_option == "Show all":
+                # Use full color scheme with uniform width
+                color = sub_location_colors.get(subloc, '#cccccc')
+                width = 2
+            else:
+                # Highlight selected, fade others
+                color = '#FF2D55' if subloc == selected_subloc_option else '#FFD0DC'
+                width = 2 if subloc == selected_subloc_option else 1
+
+            fig.add_trace(go.Scatter(
+                x=subloc_data['date'],
+                y=subloc_data[measure_type],
+                mode='lines',
+                name=subloc,
+                line=dict(color=color, width=width),
+                hovertemplate=f"{subloc}<br>Value: %{{y:.1f}}<br>Date: %{{x|%b %Y}}<extra></extra>",
+                showlegend=False
+            ))
+
+        fig.update_layout(
+            xaxis_title='',
+            yaxis_title=f'{dataset_type} {measure_type}',
+            template='simple_white',
+            height=700,
+            yaxis_tickprefix="£" if "Spend" in measure_type else "",
+            margin=dict(b=100)
+        )
+
+        return fig
+
     # Prepare selected practice data
     selected_data = icb_data_raw_merged[
         (icb_data_raw_merged['sub_location'] == sub_location) &
