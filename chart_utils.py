@@ -129,6 +129,23 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
                 showlegend=False
             ))
 
+        # Annotate selected sublocation if not "Show all"
+        if selected_subloc_option != "Show all":
+            selected_line = avg_by_subloc[avg_by_subloc['sub_location'] == selected_subloc_option]
+            last_date = selected_line['date'].max()
+            last_value = selected_line[selected_line['date'] == last_date][measure_type].values[0]
+
+            fig.add_annotation(
+                x=last_date,
+                y=last_value,
+                text=selected_subloc_option,
+                showarrow=False,
+                xanchor='left',
+                yanchor='middle',
+                font=dict(color='firebrick'),
+                xshift=5
+            )
+
         fig.update_layout(
             xaxis_title='',
             yaxis_title=f'{dataset_type} {measure_type}',
@@ -162,8 +179,6 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
 
     # National-level data
     national_data = national_data_raw_merged[national_data_raw_merged['Country'] == 'ENGLAND']
-
-    fig = go.Figure()
 
     # Plot other PCN practices
     for pcn_practice in pcn_practices['Practice'].unique():
