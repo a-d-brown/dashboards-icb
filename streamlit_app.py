@@ -299,7 +299,7 @@ else:
 
 # ── Bar Chart Section ─────────────────────────────
 
-st.header(f'{measure_type} on {dataset_type}: ICB-wide comparison in the last 3m')
+st.header(f'Practice comparisons (latest 3m): {measure_type} on {dataset_type}')
 
 # Two-column layout for sublocation and practice selector
 col1, col2 = st.columns([2, 2])
@@ -374,7 +374,7 @@ st.markdown("---")
 
 # ── Line Chart Section ─────────────────────────
 
-st.header(f'{measure_type} on {dataset_type}: Local Trends')
+st.header(f'Trend analysis: {measure_type} on {dataset_type}')
 
 # ── Redisplay Legend Above Line Chart ─────────────────────
 if len(selected_sublocations) > 1 and filtered_colors:
