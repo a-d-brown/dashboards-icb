@@ -3,7 +3,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Define function to plot bar chart
-def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, measure_metadata, highlighted_practice=None):
+def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, measure_metadata, selected_practice=None):
 
     show_xticks = filtered_data['sub_location'].nunique() == 1
 
@@ -36,14 +36,14 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
 
 
     # Highlight logic
-    if highlighted_practice:
+    if selected_practice:
         try:
-            target_pcn = filtered_data[filtered_data['Practice'] == highlighted_practice]['PCN'].values[0]
+            target_pcn = filtered_data[filtered_data['Practice'] == selected_practice]['PCN'].values[0]
         except IndexError:
             target_pcn = None
 
         fig.for_each_trace(lambda trace: _recolor_bars(
-            trace, filtered_data, highlighted_practice, target_pcn, sub_location_colors
+            trace, filtered_data, selected_practice, target_pcn, sub_location_colors
         ))
 
     fig.update_layout(
@@ -77,13 +77,13 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
     return fig
 
 # Helper function used inside the bar chart main function
-def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colors):
+def _recolor_bars(trace, df, selected_practice, target_pcn, sub_location_colors):
     if 'x' in trace and hasattr(trace.marker, 'color'):
         current_colors = list(trace.marker.color) if isinstance(trace.marker.color, list) else [trace.marker.color] * len(trace.x)
         new_colors = []
 
         for i, practice in enumerate(trace.x):
-            if practice == highlighted_practice:
+            if practice == selected_practice:
                 new_colors.append('#FF2D55')  # neon pink
             elif target_pcn and df[df['Practice'] == practice]['PCN'].values[0] == target_pcn:
                 new_colors.append('#FFB3C6')  # neon aquamarine
@@ -94,7 +94,7 @@ def _recolor_bars(trace, df, highlighted_practice, target_pcn, sub_location_colo
 
 
 # Define function to plot line chart
-def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location, selected_subloc_option, selected_practice, measure_type, dataset_type, mode="practice", sub_location_colors=None):
+def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location, selected_sublocation, selected_practice, measure_type, dataset_type, mode="practice", sub_location_colors=None):
     fig = go.Figure()
 
     if mode == "sublocations":
@@ -110,14 +110,14 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
         for subloc in unique_sublocs:
             subloc_data = avg_by_subloc[avg_by_subloc['sub_location'] == subloc]
 
-            if selected_subloc_option == "Show all":
+            if selected_sublocation == "Show all":
                 # Use full color scheme with uniform width
                 color = sub_location_colors.get(subloc, '#cccccc')
                 width = 2
             else:
                 # Highlight selected, fade others
-                color = '#FF2D55' if subloc == selected_subloc_option else '#FFD0DC'
-                width = 2 if subloc == selected_subloc_option else 1
+                color = '#FF2D55' if subloc == selected_sublocation else '#FFD0DC'
+                width = 2 if subloc == selected_sublocation else 1
 
             fig.add_trace(go.Scatter(
                 x=subloc_data['date'],
@@ -130,19 +130,51 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
             ))
 
         # Annotate selected sublocation if not "Show all"
-        if selected_subloc_option != "Show all":
-            selected_line = avg_by_subloc[avg_by_subloc['sub_location'] == selected_subloc_option]
+        if selected_sublocation != "Show all":
+            selected_line = avg_by_subloc[avg_by_subloc['sub_location'] == selected_sublocation]
             last_date = selected_line['date'].max()
             last_value = selected_line[selected_line['date'] == last_date][measure_type].values[0]
 
             fig.add_annotation(
                 x=last_date,
                 y=last_value,
-                text=selected_subloc_option,
+                text=selected_sublocation,
                 showarrow=False,
                 xanchor='left',
                 yanchor='middle',
                 font=dict(color='firebrick'),
+                xshift=5
+            )
+
+            national_data = national_data_raw_merged[national_data_raw_merged['Country'] == 'ENGLAND']
+
+            fig.add_trace(go.Scatter(
+                x=national_data['date'],
+                y=national_data[measure_type],
+                mode='lines',
+                name='National Average',
+                customdata=national_data['date'].dt.strftime('%b %Y'),
+                hovertemplate=(
+                    'National Average<br>' +
+                    'Value: %{y:.1f}<br>' +
+                    'Time Period: %{customdata}<extra></extra>'
+                ),
+                line=dict(color='#4A90E2', width=2),
+                showlegend=False
+            ))
+
+            # Label the last national value
+            last_nat_date = national_data['date'].max()
+            last_nat_value = national_data[national_data['date'] == last_nat_date][measure_type].values[0]
+
+            fig.add_annotation(
+                x=last_nat_date,
+                y=last_nat_value,
+                text='National Average',
+                showarrow=False,
+                xanchor='left',
+                yanchor='middle',
+                font=dict(color='#2A6FBA'),
                 xshift=5
             )
 

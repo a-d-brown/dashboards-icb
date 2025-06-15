@@ -307,7 +307,7 @@ col1, col2 = st.columns([2, 2])
 # ── Sub-location Dropdown (col1)
 with col1:
     subloc_options = ["Show all"] + list(sub_location_colors.keys())
-    selected_subloc_option = st.selectbox(
+    selected_sublocation = st.selectbox(
         "Select Sub-location:",
         options=subloc_options,
         index=subloc_options.index(initial_subloc) if initial_subloc in subloc_options else 0,
@@ -316,30 +316,30 @@ with col1:
 
 
 # Convert selection to a list for filtering
-if selected_subloc_option == "Show all":
+if selected_sublocation == "Show all":
     selected_sublocations = list(sub_location_colors.keys())
 else:
-    selected_sublocations = [selected_subloc_option]
+    selected_sublocations = [selected_sublocation]
 
 # Filter data
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
 
 # ── Conditional Practice Dropdown (col2)
-highlighted_practice = None
+selected_practice = None
 with col2:
-    if selected_subloc_option != "Show all":
+    if selected_sublocation != "Show all":
         practices = filtered_data['Practice'].sort_values().unique()
         practice_options = ["None"] + list(practices)
         default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
 
         selected_practice_option = st.selectbox(
-            "Highlight a practice (optional):",
+            "Select Practice:",
             options=practice_options,
             index=default_index
         )
 
         if selected_practice_option != "None":
-            highlighted_practice = selected_practice_option
+            selected_practice = selected_practice_option
 
 
 # ── Legend (only when multiple sublocations)
@@ -364,7 +364,7 @@ bar_fig = plot_icb_bar_chart(
     icb_average_value=icb_average_value,
     dataset_type=dataset_type,
     measure_metadata=measure_metadata,
-    highlighted_practice=highlighted_practice
+    selected_practice=selected_practice
 )
 
 st.plotly_chart(bar_fig, use_container_width=True)
@@ -375,9 +375,6 @@ st.markdown("---")
 # ── Line Chart Section ─────────────────────────
 
 st.header(f'{measure_type} on {dataset_type}: Local Trends')
-
-selected_sublocation = selected_subloc_option
-selected_practice = highlighted_practice
 
 # ── Redisplay Legend Above Line Chart ─────────────────────
 if len(selected_sublocations) > 1 and filtered_colors:
@@ -396,8 +393,8 @@ if selected_practice:
     line_fig = plot_line_chart(
         icb_data_raw_merged,
         national_data_raw_merged,
-        sub_location=selected_subloc_option,
-        selected_subloc_option=selected_subloc_option,
+        sub_location=selected_sublocation,
+        selected_sublocation=selected_sublocation,
         selected_practice=selected_practice,
         measure_type=measure_type,
         dataset_type=dataset_type,
@@ -411,7 +408,7 @@ else:
         icb_data_raw_merged,
         national_data_raw_merged,
         sub_location=None,
-        selected_subloc_option=selected_subloc_option,
+        selected_sublocation=selected_sublocation,
         selected_practice=None,
         measure_type=measure_type,
         dataset_type=dataset_type,
@@ -435,8 +432,8 @@ if ENABLE_DEEPLINKING:
     new_params = {
         "dataset": dataset_type,
         "measure": measure_type,
-        "sublocation": selected_subloc_option,
-        "highlight": highlighted_practice or "None"
+        "sublocation": selected_sublocation,
+        "highlight": selected_practice or "None"
     }
 
     if current_params != new_params and not st.session_state.query_updated:
