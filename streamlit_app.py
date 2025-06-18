@@ -71,6 +71,7 @@ sub_location_colors = {
 # Define available measures per dataset
 dataset_measures = {
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Gabapentinoids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Opioids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"],
@@ -153,6 +154,7 @@ def load_data(dataset_type):
     file_map = {
         'SABAs': ("__SABAs - ICB Dashboard.csv", "__SABAs - ICB Dashboard NATIONAL.csv"),
         'Opioids': ("__Opioids - ICB Dashboard.csv", "__Opioids - ICB Dashboard NATIONAL.csv"),
+        'Gabapentinoids': ("__Gabapentinoids - ICB Dashboard.csv", "__Gabapentinoids - ICB Dashboard NATIONAL.csv"),
         'Lidocaine Patches': ("__Lidocaine - ICB Dashboard.csv", "__Lidocaine - ICB Dashboard NATIONAL.csv"),
         'Antibacterials': ("__Antibacterials - ICB Dashboard.csv", "__Antibacterials - ICB Dashboard NATIONAL.csv"),
         'Closed Triple Inhalers': ("__Triple Inhalers - ICB Dashboard.csv", "__Triple Inhalers - ICB Dashboard NATIONAL.csv")
