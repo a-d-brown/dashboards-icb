@@ -17,12 +17,12 @@ if ENABLE_DEEPLINKING:
 
     query_params = st.query_params
 
-    initial_dataset = query_params.get("dataset", "SABAs")
+    initial_dataset = query_params.get("dataset", "Antibacterials")
     initial_measure = query_params.get("measure", "Spend per 1000 Patients")
     initial_subloc = query_params.get("sublocation", "Show all")
     initial_highlight = query_params.get("highlight", "None")
 else:
-    initial_dataset = "SABAs"
+    initial_dataset = "Antibacterials"
     initial_measure = "Spend per 1000 Patients"
     initial_subloc = "Show all"
     initial_highlight = "None"
@@ -70,12 +70,13 @@ sub_location_colors = {
 
 # Define available measures per dataset - dataset name must match filename
 dataset_measures = {
-    "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"],
     "Gabapentinoids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Opioids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
-    "Antibacterials": ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"],
-    "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]
+    "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
+    "Bath & Shower Emollients": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]
 }
 
 # Measure Metadata ─────────────────────────────
