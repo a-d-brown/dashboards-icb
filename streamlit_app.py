@@ -68,7 +68,7 @@ sub_location_colors = {
     'Tees Valley': '#17becf'
 }
 
-# Define available measures per dataset
+# Define available measures per dataset - dataset name must match filename
 dataset_measures = {
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Gabapentinoids": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
@@ -151,16 +151,9 @@ def aggregate_substance_data(df, group_cols):
 # Load data based on selected dataset type
 @st.cache_data
 def load_data(dataset_type):
-    file_map = {
-        'SABAs': ("__SABAs - ICB Dashboard.csv", "__SABAs - ICB Dashboard NATIONAL.csv"),
-        'Opioids': ("__Opioids - ICB Dashboard.csv", "__Opioids - ICB Dashboard NATIONAL.csv"),
-        'Gabapentinoids': ("__Gabapentinoids - ICB Dashboard.csv", "__Gabapentinoids - ICB Dashboard NATIONAL.csv"),
-        'Lidocaine Patches': ("__Lidocaine - ICB Dashboard.csv", "__Lidocaine - ICB Dashboard NATIONAL.csv"),
-        'Antibacterials': ("__Antibacterials - ICB Dashboard.csv", "__Antibacterials - ICB Dashboard NATIONAL.csv"),
-        'Closed Triple Inhalers': ("__Triple Inhalers - ICB Dashboard.csv", "__Triple Inhalers - ICB Dashboard NATIONAL.csv")
-    }
+    icb_path = f"__{dataset_type} - ICB Dashboard.csv"
+    national_path = f"__{dataset_type} - ICB Dashboard NATIONAL.csv"
 
-    icb_path, national_path = file_map[dataset_type]
     icb_data_raw = pd.read_csv(icb_path)
     national_data_raw = pd.read_csv(national_path)
 
