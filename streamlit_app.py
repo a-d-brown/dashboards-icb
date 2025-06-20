@@ -76,7 +76,7 @@ dataset_measures = {
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
-    "Bath & Shower Emollients": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"]
+    "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"]
 }
 
 # Measure Metadata ─────────────────────────────
@@ -244,20 +244,20 @@ if measure_metadata[measure_type]["denominator_column"] == "COPD List Size":
 ## ── Aggregation and Measure Calculation ─────────
 
 # Apply aggregation function
-icb_data_raw_merged = aggregate_substance_data(icb_data_preprocessed, ['Practice', 'date_period']) # indexed by both practice and date_period. date period helps standardise grouping for bar chart.
+icb_data_aggregated = aggregate_substance_data(icb_data_preprocessed, ['Practice', 'date_period']) # indexed by both practice and date_period. date period helps standardise grouping for bar chart.
 national_data_raw_merged = aggregate_substance_data(national_data_preprocessed, ['date']) # only date index needed as one-dimensional data. plotly expects datetime[ns64] for line chart.
 
 # Calculate mean spend and items in last 3m
-recent_data = icb_data_raw_merged.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
+recent_data = icb_data_aggregated.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
 means = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']].mean().round(1) # Calculate means
-base_means = icb_data_raw_merged.drop_duplicates(subset='Practice').drop(columns=['List Size', 'COPD List Size','Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']) # Create metadata base
+base_means = icb_data_aggregated.drop_duplicates(subset='Practice').drop(columns=['List Size', 'COPD List Size','Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']) # Create metadata base
 icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
 # Decide which numerator and denominator column to use
 numerator_column = measure_metadata[measure_type]["numerator_column"]
 denominator_column = measure_metadata[measure_type]["denominator_column"]
 
-# Calculate 3m mean rates
+# Calculate rates using 3m means
 icb_means_merged[measure_type] = (
     (icb_means_merged[numerator_column] / icb_means_merged[denominator_column]) * 1000
 ).round(1)
@@ -275,8 +275,8 @@ icb_average_value = (total_numerator / total_denominator) * 1000
 # ── Line chart: Calculate Monthly Rate Columns ──────────
 
 # Calculate monthly rates for ICB data
-icb_data_raw_merged[measure_type] = (
-    (icb_data_raw_merged[numerator_column] / icb_data_raw_merged[denominator_column]) * 1000
+icb_data_aggregated[measure_type] = (
+    (icb_data_aggregated[numerator_column] / icb_data_aggregated[denominator_column]) * 1000
 ).round(1)
 
 # Calculate monthly rates for national data
@@ -387,7 +387,7 @@ if len(selected_sublocations) > 1 and filtered_colors:
 
 if selected_practice:
     line_fig = plot_line_chart(
-        icb_data_raw_merged,
+        icb_data_aggregated,
         national_data_raw_merged,
         sub_location=selected_sublocation,
         selected_sublocation=selected_sublocation,
@@ -401,7 +401,7 @@ if selected_practice:
 
 else:
     line_fig = plot_line_chart(
-        icb_data_raw_merged,
+        icb_data_aggregated,
         national_data_raw_merged,
         sub_location=None,
         selected_sublocation=selected_sublocation,
