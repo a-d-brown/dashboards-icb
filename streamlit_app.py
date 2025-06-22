@@ -1,10 +1,12 @@
 ## ── Imports and Config ────────────────────────
 import pandas as pd
+import os
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import streamlit as st
-from chart_utils import plot_icb_bar_chart, plot_line_chart
+from chart_utils import plot_icb_bar_chart, plot_line_chart, plot_high_cost_drugs_scatter
+
 
 # Experimental deeplinking
 ENABLE_DEEPLINKING = False
@@ -76,7 +78,8 @@ dataset_measures = {
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
-    "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"]
+    "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "High Cost Drugs": ["Spend per 1000 Patients", "Items per 1000 Patients"]
 }
 
 # Measure Metadata ─────────────────────────────
@@ -153,15 +156,24 @@ def aggregate_substance_data(df, group_cols):
 @st.cache_data
 def load_data(dataset_type):
     icb_path = f"__{dataset_type} - ICB Dashboard.csv"
-    national_path = f"__{dataset_type} - ICB Dashboard NATIONAL.csv"
-
     icb_data_raw = pd.read_csv(icb_path)
-    national_data_raw = pd.read_csv(national_path)
 
-    icb_data_preprocessed = preprocess_prescribing_data(icb_data_raw, is_national=False, mapping=sicbl_legend_mapping)
-    national_data_preprocessed = preprocess_prescribing_data(national_data_raw, is_national=True)
+    if dataset_type == "High Cost Drugs":
+        icb_data_preprocessed = icb_data_raw  # Already preprocessed elsewhere
+        national_data_preprocessed = None     # No national data
+    else:
+        icb_data_preprocessed = preprocess_prescribing_data(
+            icb_data_raw, is_national=False, mapping=sicbl_legend_mapping
+        )
+
+        national_path = f"__{dataset_type} - ICB Dashboard NATIONAL.csv"
+        national_data_raw = pd.read_csv(national_path)
+        national_data_preprocessed = preprocess_prescribing_data(
+            national_data_raw, is_national=True
+        )
 
     return icb_data_preprocessed, national_data_preprocessed
+
 
 # Load COPD list size data
 copd_list_size_df = pd.read_csv("copd_register_may25.csv") # this file 
@@ -171,7 +183,6 @@ copd_list_size_df.rename(columns={'COPD Register': 'COPD List Size'}, inplace=Tr
 
 
 ## ── UI: Header and Select Boxes ────────────────
-
 col1, col2 = st.columns([3, 1]) # two column layout
 
 with col1:
@@ -229,33 +240,56 @@ with col2:
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
-# Merge COPD List Size into ICB data
-icb_data_preprocessed = icb_data_preprocessed.merge(
-    copd_list_size_df,
-    on='Practice',
-    how='left'
-)
+# Decide which numerator and denominator column to use
+numerator_column = measure_metadata[measure_type]["numerator_column"]
+denominator_column = measure_metadata[measure_type]["denominator_column"]
 
-# Exclude rows with missing COPD List Size if measure requires it
-if measure_metadata[measure_type]["denominator_column"] == "COPD List Size":
-    icb_data_preprocessed = icb_data_preprocessed[icb_data_preprocessed["COPD List Size"].notna()]
+# Merge and filter COPD List Size if needed
+if dataset_type != "High Cost Drugs":
+    icb_data_preprocessed = icb_data_preprocessed.merge(
+        copd_list_size_df,
+        on='Practice',
+        how='left'
+    )
+
+    if measure_metadata[measure_type]["denominator_column"] == "COPD List Size":  # Exclude rows with missing COPD List Size if measure requires it
+        icb_data_preprocessed = icb_data_preprocessed[icb_data_preprocessed["COPD List Size"].notna()]
 
 
 ## ── Aggregation and Measure Calculation ─────────
 
 # Apply aggregation function
 icb_data_aggregated = aggregate_substance_data(icb_data_preprocessed, ['Practice', 'date_period']) # indexed by both practice and date_period. date period helps standardise grouping for bar chart.
-national_data_raw_merged = aggregate_substance_data(national_data_preprocessed, ['date']) # only date index needed as one-dimensional data. plotly expects datetime[ns64] for line chart.
+
+# Only apply aggregation function to national data where it exists
+if national_data_preprocessed is not None:
+    national_data_raw_merged = aggregate_substance_data(national_data_preprocessed, ['date'])  # indexed by date, which is more suitable for line chart
+
+    # Calculate national monthly rates for line chart
+    if denominator_column == "COPD List Size":
+        national_data_raw_merged[measure_type] = (
+            (national_data_raw_merged[numerator_column] / NATIONAL_COPD_LIST_SIZE) * 1000
+        ).round(1)
+    else:
+        national_data_raw_merged[measure_type] = (
+            (national_data_raw_merged[numerator_column] / national_data_raw_merged[denominator_column]) * 1000
+        ).round(1)
+else:
+    national_data_raw_merged = None
 
 # Calculate mean spend and items in last 3m
-recent_data = icb_data_aggregated.sort_values('date', ascending=False).groupby('Practice').head(3) # Get latest 3m into a df
-means = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']].mean().round(1) # Calculate means
-base_means = icb_data_aggregated.drop_duplicates(subset='Practice').drop(columns=['List Size', 'COPD List Size','Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']) # Create metadata base
-icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
+recent_data = icb_data_aggregated.sort_values('date_period', ascending=False).groupby('Practice').head(3)
+if dataset_type == "High Cost Drugs":
+    means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items']].mean().round(1)
+    columns_to_drop = ['List Size', 'Actual Cost', 'Items', 'date', 'formatted_date']
+else:
+    means = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']].mean().round(1)
+    columns_to_drop = ['List Size', 'COPD List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']
 
-# Decide which numerator and denominator column to use
-numerator_column = measure_metadata[measure_type]["numerator_column"]
-denominator_column = measure_metadata[measure_type]["denominator_column"]
+base_means = icb_data_aggregated.drop_duplicates(subset='Practice').drop(
+    columns=[col for col in columns_to_drop if col in icb_data_aggregated.columns]
+)
+icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
 
 # Calculate rates using 3m means
 icb_means_merged[measure_type] = (
@@ -279,15 +313,7 @@ icb_data_aggregated[measure_type] = (
     (icb_data_aggregated[numerator_column] / icb_data_aggregated[denominator_column]) * 1000
 ).round(1)
 
-# Calculate monthly rates for national data
-if denominator_column == "COPD List Size":
-    national_data_raw_merged[measure_type] = (
-        (national_data_raw_merged[numerator_column] / NATIONAL_COPD_LIST_SIZE) * 1000
-    ).round(1)
-else:
-    national_data_raw_merged[measure_type] = (
-        (national_data_raw_merged[numerator_column] / national_data_raw_merged[denominator_column]) * 1000
-    ).round(1)
+
 
 
 
@@ -369,72 +395,89 @@ st.markdown("---")
 
 
 # ── Line Chart Section ─────────────────────────
+# ── Trend / Scatter Chart Section ─────────────────────────
+# ── Trend / Scatter Chart Section ─────────────────────────
+if dataset_type == "High Cost Drugs":
+    if selected_practice:
+        st.header(f'Top 100 High Cost Drugs at {selected_practice}')
 
-st.header(f'Trend analysis: {measure_type} on {dataset_type}')
+        # Use already loaded and correct data
+        scatter_fig = plot_high_cost_drugs_scatter(icb_data_preprocessed, selected_practice)
 
-# ── Redisplay Legend Above Line Chart ─────────────────────
-if len(selected_sublocations) > 1 and filtered_colors:
-    legend_cols = st.columns(len(filtered_colors))
-    for i, (subloc, color) in enumerate(filtered_colors.items()):
-        with legend_cols[i]:
-            st.markdown(
-                f"<div style='display: flex; align-items: center;'>"
-                f"<div style='width: 14px; height: 14px; background-color: {color}; margin-right: 6px; border: 1px solid #00000022;'></div>"
-                f"<span style='font-size: 13px;'>{subloc}</span></div>",
-                unsafe_allow_html=True
-            )
-
-
-if selected_practice:
-    line_fig = plot_line_chart(
-        icb_data_aggregated,
-        national_data_raw_merged,
-        sub_location=selected_sublocation,
-        selected_sublocation=selected_sublocation,
-        selected_practice=selected_practice,
-        measure_type=measure_type,
-        dataset_type=dataset_type,
-        mode="practice"
-    )
-
-    st.plotly_chart(line_fig, use_container_width=True)
+        if scatter_fig:
+            st.plotly_chart(scatter_fig, use_container_width=True)
+        else:
+            st.info("No data available for the selected practice.")
 
 else:
-    line_fig = plot_line_chart(
-        icb_data_aggregated,
-        national_data_raw_merged,
-        sub_location=None,
-        selected_sublocation=selected_sublocation,
-        selected_practice=None,
-        measure_type=measure_type,
-        dataset_type=dataset_type,
-        mode="sublocations",
-        sub_location_colors=sub_location_colors
-    )
 
-    st.plotly_chart(line_fig, use_container_width=True)
+    # Existing line chart section for other datasets
+
+    st.header(f'Trend analysis: {measure_type} on {dataset_type}')
+
+    # ── Redisplay Legend Above Line Chart ─────────────────────
+    if len(selected_sublocations) > 1 and filtered_colors:
+        legend_cols = st.columns(len(filtered_colors))
+        for i, (subloc, color) in enumerate(filtered_colors.items()):
+            with legend_cols[i]:
+                st.markdown(
+                    f"<div style='display: flex; align-items: center;'>"
+                    f"<div style='width: 14px; height: 14px; background-color: {color}; margin-right: 6px; border: 1px solid #00000022;'></div>"
+                    f"<span style='font-size: 13px;'>{subloc}</span></div>",
+                    unsafe_allow_html=True
+                )
+
+
+    if selected_practice:
+        line_fig = plot_line_chart(
+            icb_data_aggregated,
+            national_data_raw_merged,
+            sub_location=selected_sublocation,
+            selected_sublocation=selected_sublocation,
+            selected_practice=selected_practice,
+            measure_type=measure_type,
+            dataset_type=dataset_type,
+            mode="practice"
+        )
+
+        st.plotly_chart(line_fig, use_container_width=True)
+
+    else:
+        line_fig = plot_line_chart(
+            icb_data_aggregated,
+            national_data_raw_merged,
+            sub_location=None,
+            selected_sublocation=selected_sublocation,
+            selected_practice=None,
+            measure_type=measure_type,
+            dataset_type=dataset_type,
+            mode="sublocations",
+            sub_location_colors=sub_location_colors
+        )
+
+        st.plotly_chart(line_fig, use_container_width=True)
 
 
 
-# Deeplinking param updates
-if ENABLE_DEEPLINKING:
-    current_params = {
-        "dataset": initial_dataset,
-        "measure": initial_measure,
-        "sublocation": initial_subloc,
-        "highlight": initial_highlight,
-    }
+    # Deeplinking param updates
+    if ENABLE_DEEPLINKING:
+        current_params = {
+            "dataset": initial_dataset,
+            "measure": initial_measure,
+            "sublocation": initial_subloc,
+            "highlight": initial_highlight,
+        }
 
-    new_params = {
-        "dataset": dataset_type,
-        "measure": measure_type,
-        "sublocation": selected_sublocation,
-        "highlight": selected_practice or "None"
-    }
+        new_params = {
+            "dataset": dataset_type,
+            "measure": measure_type,
+            "sublocation": selected_sublocation,
+            "highlight": selected_practice or "None"
+        }
 
-    if current_params != new_params and not st.session_state.query_updated:
-        st.query_params.update(new_params)
-        st.session_state.query_updated = True
+        if current_params != new_params and not st.session_state.query_updated:
+            st.query_params.update(new_params)
+            st.session_state.query_updated = True
 
 
 

@@ -300,3 +300,39 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     )
 
     return fig
+
+
+
+def plot_high_cost_drugs_scatter(hcd_df, selected_practice):
+    # Filter to selected practice
+    df = hcd_df[hcd_df["Practice"] == selected_practice].copy()
+
+    if df.empty:
+        return None  # graceful fail if no data
+
+    # Aggregate by BNF Presentation plus Code
+    summary = (
+        df.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
+        .sum()
+        .sort_values("Actual Cost", ascending=False)
+        .head(100)
+    )
+
+    # Explicitly assign the presentation name to a label column (in case hover_name fails)
+    summary["Label"] = summary["BNF Presentation plus Code"]
+
+    # Generate scatter plot
+    fig = px.scatter(
+        summary,
+        x="Items",
+        y="Actual Cost",
+        hover_name="Label",
+        labels={"Actual Cost": "Actual Cost (£)", "Items": "Items"}
+    )
+
+    fig.update_traces(marker=dict(opacity=0.7, line=dict(width=1, color='DarkSlateGrey')))
+    fig.update_layout(height=700)
+
+    return fig
+
+
