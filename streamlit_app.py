@@ -113,7 +113,12 @@ measure_metadata = {
         "denominator_column": "COPD List Size",
         "numerator_column": "Items",
         "prefix": ""
-    }
+    },
+    "Δ from previous": {
+    "prefix": "",
+    "suffix": "%"
+}
+
 }
 
 
@@ -124,6 +129,7 @@ NATIONAL_COPD_LIST_SIZE = 1175163
 
 # Preprocess data to standardised format
 def preprocess_prescribing_data(df, is_national, mapping=None):
+    # Clean and map only for local ICB data
     if not is_national:
         df = df[df['PCN'] != 'DUMMY']
         df = df[~df['Practice'].str.contains(r'\( ?[CD] ?\d', na=False)]
@@ -131,18 +137,36 @@ def preprocess_prescribing_data(df, is_national, mapping=None):
         df['Commissioner / Provider Code'] = df['Commissioner / Provider Code'].str.slice(0, -2)
         df['sub_location'] = df['Commissioner / Provider Code'].map(mapping)
 
+    # Standardise date columns
     df.rename(columns={'Year Month': 'date'}, inplace=True)
     df['date'] = pd.to_datetime(df['date'], format='%Y%m')
     df['formatted_date'] = df['date'].dt.strftime('%b %Y')
 
-    if not is_national:
-        df['date_period'] = df['date'].dt.to_period('M')
+    # Always calculate monthly period for trend logic
+    df['date_period'] = df['date'].dt.to_period('M').dt.to_timestamp()
 
+    # Add 'period_tag' for trend analysis (recent / previous / other)
+    latest_6_months = df['date_period'].drop_duplicates().sort_values(ascending=False).head(6).tolist()
+    recent_3m = latest_6_months[:3]
+    prev_3m = latest_6_months[3:6]
+
+    def label_period(period):
+        if period in recent_3m:
+            return "recent"
+        elif period in prev_3m:
+            return "previous"
+        else:
+            return "other"
+
+    df['period_tag'] = df['date_period'].apply(label_period)
+
+    # Ensure all required columns exist
     for col in ['ADQ Usage', 'DDD Usage']:
         if col not in df.columns:
             df[col] = 0
 
     return df
+
 
 # Aggregate prescribing data to Chemical level based on a certain index
 def aggregate_substance_data(df, group_cols):
@@ -240,6 +264,7 @@ with col2:
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
+
 # Decide which numerator and denominator column to use
 numerator_column = measure_metadata[measure_type]["numerator_column"]
 denominator_column = measure_metadata[measure_type]["denominator_column"]
@@ -261,6 +286,25 @@ if dataset_type != "High Cost Drugs":
 # Apply aggregation function
 icb_data_aggregated = aggregate_substance_data(icb_data_preprocessed, ['Practice', 'date_period']) # indexed by both practice and date_period. date period helps standardise grouping for bar chart.
 
+# Reattach 'period_tag' from the original preprocessed data
+if 'period_tag' in icb_data_preprocessed.columns:
+    period_tags = icb_data_preprocessed[['Practice', 'date_period', 'period_tag']].drop_duplicates()
+
+    # Check matches
+    matches = icb_data_aggregated.merge(
+        period_tags,
+        on=['Practice', 'date_period'],
+        how='inner'
+    )
+    # Merge safely without duplicate columns
+    icb_data_aggregated = icb_data_aggregated.merge(
+        period_tags,
+        on=['Practice', 'date_period'],
+        how='left',
+        suffixes=('', '_drop')
+    )
+    icb_data_aggregated.drop(columns=[col for col in icb_data_aggregated.columns if col.endswith('_drop')], inplace=True)
+
 # Only apply aggregation function to national data where it exists
 if national_data_preprocessed is not None:
     national_data_raw_merged = aggregate_substance_data(national_data_preprocessed, ['date'])  # indexed by date, which is more suitable for line chart
@@ -277,24 +321,72 @@ if national_data_preprocessed is not None:
 else:
     national_data_raw_merged = None
 
-# Calculate mean spend and items in last 3m
-recent_data = icb_data_aggregated.sort_values('date_period', ascending=False).groupby('Practice').head(3)
+# Filter to latest 3 months
+recent_data = icb_data_aggregated[icb_data_aggregated['period_tag'] == 'recent']
+
+# STEP 1: Sum numerators over latest 3 months
 if dataset_type == "High Cost Drugs":
-    means = recent_data.groupby('Practice', as_index=False)[['List Size', 'Actual Cost', 'Items']].mean().round(1)
-    columns_to_drop = ['List Size', 'Actual Cost', 'Items', 'date', 'formatted_date']
+    sum_numerators = recent_data.groupby('Practice', as_index=False)[['Actual Cost', 'Items']].sum().round(1)
 else:
-    means = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']].mean().round(1)
-    columns_to_drop = ['List Size', 'COPD List Size', 'Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'date', 'formatted_date']
+    sum_numerators = recent_data.groupby('Practice', as_index=False)[
+        ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
+    ].sum().round(1)
 
-base_means = icb_data_aggregated.drop_duplicates(subset='Practice').drop(
-    columns=[col for col in columns_to_drop if col in icb_data_aggregated.columns]
-)
-icb_means_merged = pd.merge(base_means, means, on='Practice') # Merge base with means
+# STEP 2: Mean denominator (List Size) over latest 3 months
+if dataset_type == "High Cost Drugs":
+    mean_denominators = recent_data.groupby('Practice', as_index=False)[['List Size']].mean().round(1)
+else:
+    mean_denominators = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List Size']].mean().round(1)
 
-# Calculate rates using 3m means
+# STEP 3: Merge together
+means = pd.merge(sum_numerators, mean_denominators, on='Practice')
+
+# Optional: drop unnecessary columns from base
+columns_to_drop = [col for col in ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'List Size', 'COPD List Size', 'date', 'formatted_date'] if col in icb_data_aggregated.columns]
+base_means = icb_data_aggregated.drop_duplicates(subset='Practice').drop(columns=columns_to_drop)
+
+# STEP 4: Merge base info with new means
+icb_means_merged = pd.merge(base_means, means, on='Practice')
+
+# STEP 5: Calculate rate
 icb_means_merged[measure_type] = (
     (icb_means_merged[numerator_column] / icb_means_merged[denominator_column]) * 1000
 ).round(1)
+
+# Calculate PREVIOUS rates using 4-6m data (only for non-High Cost Drugs)
+if dataset_type != "High Cost Drugs":
+    previous_data = icb_data_aggregated[icb_data_aggregated['period_tag'] == 'previous']
+
+    # STEP 1: Sum numerators over previous 3 months
+    prev_sum_numerators = previous_data.groupby('Practice', as_index=False)[
+        ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
+    ].sum().round(1)
+
+    # STEP 2: Mean denominators over previous 3 months
+    prev_mean_denominators = previous_data.groupby('Practice', as_index=False)[
+        ['List Size', 'COPD List Size']
+    ].mean().round(1)
+
+    # STEP 3: Merge numerator and denominator
+    previous_means = pd.merge(prev_sum_numerators, prev_mean_denominators, on='Practice')
+
+    # STEP 4: Merge with base (which already contains recent values), creating new cols with _prev suffixed
+    icb_means_merged = pd.merge(
+        icb_means_merged, previous_means, on='Practice', suffixes=('', '_prev')
+    )
+
+    # STEP 5: Calculate previous-period rate using same formula
+    icb_means_merged[f"{measure_type} (previous)"] = (
+        icb_means_merged[f"{numerator_column}_prev"] / icb_means_merged[f"{denominator_column}_prev"] * 1000
+    ).round(1)
+
+    # STEP 6: Calculate % CHANGE
+    icb_means_merged["Δ from previous"] = (
+        (icb_means_merged[measure_type] - icb_means_merged[f"{measure_type} (previous)"]) /
+        icb_means_merged[f"{measure_type} (previous)"] * 100
+    ).round(1)
+
+
 
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
@@ -312,8 +404,6 @@ icb_average_value = (total_numerator / total_denominator) * 1000
 icb_data_aggregated[measure_type] = (
     (icb_data_aggregated[numerator_column] / icb_data_aggregated[denominator_column]) * 1000
 ).round(1)
-
-
 
 
 
@@ -378,28 +468,50 @@ if len(selected_sublocations) > 1 and filtered_colors:
                 unsafe_allow_html=True
             )
 
+# ── Toggle for bar chart y-axis mode ─────────────
+use_delta_chart = False
+if dataset_type != "High Cost Drugs":
+    mode_option = st.radio(
+        "",
+        ["Current rate", "Change from previous 3m"],
+        index=0,
+        horizontal=True
+    )
+    use_delta_chart = mode_option == "Change from previous 3m"
+
+# Determine which column to use for y-axis
+if use_delta_chart:
+    y_axis_column = "Δ from previous"
+    y_axis_label = f"{dataset_type} {measure_type} Δ from previous 3m"
+else:
+    y_axis_column = measure_type
+    y_axis_label = f"{dataset_type} {measure_type}"
+
+
+
 # Render Bar Chart
 bar_fig = plot_icb_bar_chart(
     filtered_data=filtered_data,
-    measure_type=measure_type,
+    measure_type=y_axis_column,
     sub_location_colors=sub_location_colors,
     icb_average_value=icb_average_value,
     dataset_type=dataset_type,
     measure_metadata=measure_metadata,
-    selected_practice=selected_practice
+    selected_practice=selected_practice,
+    delta_column="Δ from previous" if dataset_type != "High Cost Drugs" else None,
+    y_axis_label=y_axis_label
 )
+
 
 st.plotly_chart(bar_fig, use_container_width=True)
 
 st.markdown("---")
 
 
-# ── Line Chart Section ─────────────────────────
-# ── Trend / Scatter Chart Section ─────────────────────────
 # ── Trend / Scatter Chart Section ─────────────────────────
 if dataset_type == "High Cost Drugs":
     if selected_practice:
-        st.header(f'Top 100 High Cost Drugs at {selected_practice}')
+        st.header(f'Top 100 High Cost Drugs (latest 3m) at {selected_practice}')
 
         # Use already loaded and correct data
         scatter_fig = plot_high_cost_drugs_scatter(icb_data_preprocessed, selected_practice)

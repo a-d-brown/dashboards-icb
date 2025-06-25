@@ -3,7 +3,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Define function to plot bar chart
-def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value, dataset_type, measure_metadata, selected_practice=None):
+def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_average_value,
+                       dataset_type, measure_metadata, selected_practice=None, delta_column=None, y_axis_label=None):
 
     show_xticks = filtered_data['sub_location'].nunique() == 1
 
@@ -20,19 +21,36 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
     )
 
     # Determine whether to add £ prefix
-    prefix = measure_metadata[measure_type].get("prefix", "")
+    if measure_type in measure_metadata:
+        prefix = measure_metadata[measure_type].get("prefix", "")
+        suffix = measure_metadata[measure_type].get("suffix", "")
+    else:
+        prefix = ""
+        suffix = ""
+
+
 
     # Add formatted hovertemplate
     for trace in fig.data:
         subloc = trace.name
         subloc_data = filtered_data[filtered_data['sub_location'] == subloc]
 
-        trace.customdata = subloc_data[["Items (monthly average)"]].to_numpy()
-        trace.hovertemplate = (
-            f"<b>%{{x}}</b><br>{measure_type}: {prefix}%{{y:.1f}}<br>"
-            "Items (monthly average): %{customdata[0]:.0f}<extra></extra>"
-        )
+        # Build customdata array depending on delta_column
+        if delta_column and delta_column in subloc_data.columns:
+            trace.customdata = subloc_data[["Items (monthly average)", delta_column]].to_numpy()
+            trace.hovertemplate = (
+                f"<b>%{{x}}</b><br>{measure_type}: {prefix}%{{y:.1f}}{suffix}<br>"
+                "Items (monthly average): %{customdata[0]:.0f}<extra></extra>"
+            )
+        else:
+            trace.customdata = subloc_data[["Items (monthly average)"]].to_numpy()
+            trace.hovertemplate = (
+                f"<b>%{{x}}</b><br>{measure_type}: {prefix}%{{y:.1f}}<br>"
+                "Items (monthly average): %{customdata[0]:.0f}<extra></extra>"
+            )
+
         trace.width = 0.6
+
 
 
     # Highlight logic
@@ -46,33 +64,44 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
             trace, filtered_data, selected_practice, target_pcn, sub_location_colors
         ))
 
+    # Dynamically scale y-axis for delta vs rate
+    if measure_type == "Δ from previous":
+        y_min = min(filtered_data["Δ from previous"].min(), -5)  # Set sensible min floor
+        y_max = max(filtered_data["Δ from previous"].max(), 5)   # Set sensible max ceiling
+        yaxis_range = [y_min, y_max]
+    else:
+        yaxis_range = None  # Let Plotly auto-scale
+
     fig.update_layout(
         height=700,
         width=1150,
         xaxis_title='',
-        yaxis_title=f'{dataset_type} {measure_type}',
+        yaxis_title = y_axis_label or f'{dataset_type} {measure_type}',
         yaxis_tickprefix=prefix,
+        yaxis_ticksuffix=suffix,
         legend_title_text=None,
         xaxis=dict(showticklabels=show_xticks, showgrid=False, tickangle=45, tickfont=dict(size=10)),
-        yaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=False, range=yaxis_range),
         legend=dict(orientation="h", yanchor="bottom", y=1, xanchor="center", x=0.5),
         margin=dict(r=100),
         showlegend=False
     )
 
-    fig.add_shape(
-        type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
-        line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"
-    )
+    # Add ICB average line (unless showing % CHANGE)
+    if measure_type != "Δ from previous":
+        fig.add_shape(
+            type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
+            line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"
+        )
 
-    fig.add_annotation(
-        x=1, y=icb_average_value,
-        text="ICB Average",
-        showarrow=False,
-        font=dict(size=12, color="black"),
-        xref="paper", yref="y",
-        xanchor="left", yanchor="middle"
-    )
+        fig.add_annotation(
+            x=1, y=icb_average_value,
+            text="ICB Average",
+            showarrow=False,
+            font=dict(size=12, color="black"),
+            xref="paper", yref="y",
+            xanchor="left", yanchor="middle"
+        )
 
     return fig
 
@@ -300,7 +329,6 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     )
 
     return fig
-
 
 
 def plot_high_cost_drugs_scatter(hcd_df, selected_practice):
