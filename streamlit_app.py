@@ -413,7 +413,7 @@ icb_data_aggregated[measure_type] = (
 
 # ── Bar Chart Section ─────────────────────────────
 
-st.header(f'Practice comparisons (latest 3m): {measure_type} on {dataset_type}')
+st.header(f'Practice comparisons (latest 3m): {dataset_type} - {measure_type}')
 
 # Two-column layout for sublocation and practice selector
 col1, col2 = st.columns([2, 2])
