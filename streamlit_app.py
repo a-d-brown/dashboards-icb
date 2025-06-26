@@ -78,6 +78,7 @@ dataset_measures = {
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
+    "Vitamin D": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
     "PPIs": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "High Cost Drugs": ["Spend per 1000 Patients", "Items per 1000 Patients"]
@@ -397,7 +398,6 @@ icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=Tr
 total_numerator = sum_numerators[numerator_column].sum()
 total_denominator = mean_denominators[denominator_column].sum()
 icb_average_value = (total_numerator / total_denominator) * 1000
-
 
 
 # ── Line chart: Calculate Monthly Rate Columns ──────────
