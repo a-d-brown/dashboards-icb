@@ -394,9 +394,10 @@ icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Rou
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
 # Calculate ICB Average Values
-total_numerator = recent_data[numerator_column].sum()
-total_denominator = recent_data[denominator_column].sum()
+total_numerator = sum_numerators[numerator_column].sum()
+total_denominator = mean_denominators[denominator_column].sum()
 icb_average_value = (total_numerator / total_denominator) * 1000
+
 
 
 # ── Line chart: Calculate Monthly Rate Columns ──────────
