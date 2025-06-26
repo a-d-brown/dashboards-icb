@@ -527,7 +527,7 @@ else:
 
     # Existing line chart section for other datasets
 
-    st.header(f'Trend analysis: {measure_type} on {dataset_type}')
+    st.header(f'Trend analysis: {dataset_type} - {measure_type}')
 
     # ── Redisplay Legend Above Line Chart ─────────────────────
     if len(selected_sublocations) > 1 and filtered_colors:
