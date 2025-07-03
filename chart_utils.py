@@ -66,11 +66,13 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
 
     # Dynamically scale y-axis for delta vs rate
     if measure_type in ["Δ from previous", "Δ from last year"]:
-        y_min = min(filtered_data["Δ from previous"].min(), -5)  # Set sensible min floor
-        y_max = max(filtered_data["Δ from previous"].max(), 5)   # Set sensible max ceiling
+        data_max = filtered_data[measure_type].max()
+        y_max = max(data_max * 1.05, 5)  # Add 10% margin or minimum 5
+        y_min = min(filtered_data[measure_type].min(), -5)
         yaxis_range = [y_min, y_max]
     else:
-        yaxis_range = None  # Let Plotly auto-scale
+        yaxis_range = None
+
 
     fig.update_layout(
         height=700,
