@@ -65,7 +65,7 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
         ))
 
     # Dynamically scale y-axis for delta vs rate
-    if measure_type == "Δ from previous":
+    if measure_type in ["Δ from previous", "Δ from last year"]:
         y_min = min(filtered_data["Δ from previous"].min(), -5)  # Set sensible min floor
         y_max = max(filtered_data["Δ from previous"].max(), 5)   # Set sensible max ceiling
         yaxis_range = [y_min, y_max]
@@ -88,7 +88,7 @@ def plot_icb_bar_chart(filtered_data, measure_type, sub_location_colors, icb_ave
     )
 
     # Add ICB average line (unless showing % CHANGE)
-    if measure_type != "Δ from previous":
+    if measure_type not in ["Δ from previous", "Δ from last year"]:
         fig.add_shape(
             type="line", x0=0, x1=1, y0=icb_average_value, y1=icb_average_value,
             line=dict(color="black", width=1.5, dash="dash"), xref="paper", yref="y"

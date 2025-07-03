@@ -119,7 +119,11 @@ measure_metadata = {
     "Δ from previous": {
     "prefix": "",
     "suffix": "%"
-}
+    },
+    "Δ from last year": {
+    "prefix": "",
+    "suffix": "%"
+    }
 
 }
 
@@ -148,15 +152,20 @@ def preprocess_prescribing_data(df, is_national, mapping=None):
     df['date_period'] = df['date'].dt.to_period('M').dt.to_timestamp()
 
     # Add 'period_tag' for trend analysis (recent / previous / other)
-    latest_6_months = df['date_period'].drop_duplicates().sort_values(ascending=False).head(6).tolist()
-    recent_3m = latest_6_months[:3]
-    prev_3m = latest_6_months[3:6]
+    latest_15_months = df['date_period'].drop_duplicates().sort_values(ascending=False).head(15).tolist()
+
+    # Define tagged time periods
+    recent_3m = latest_15_months[:3]
+    prev_3m = latest_15_months[3:6]
+    last_year_3m = latest_15_months[12:15]
 
     def label_period(period):
         if period in recent_3m:
             return "recent"
         elif period in prev_3m:
             return "previous"
+        elif period in last_year_3m:
+            return "last_year"
         else:
             return "other"
 
@@ -265,7 +274,6 @@ with col2:
 
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
-
 
 # Decide which numerator and denominator column to use
 numerator_column = measure_metadata[measure_type]["numerator_column"]
@@ -388,6 +396,39 @@ if dataset_type != "High Cost Drugs":
         icb_means_merged[f"{measure_type} (previous)"] * 100
     ).round(1)
 
+# Calculate LAST YEAR rates using matching period 12 months ago
+if dataset_type != "High Cost Drugs":
+    last_year_data = icb_data_aggregated[icb_data_aggregated['period_tag'] == 'last_year']
+
+    # STEP 1: Sum numerators over last-year 3 months
+    last_year_sum_numerators = last_year_data.groupby('Practice', as_index=False)[
+        ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
+    ].sum().round(1)
+
+    # STEP 2: Mean denominators over last-year 3 months
+    last_year_mean_denominators = last_year_data.groupby('Practice', as_index=False)[
+        ['List Size', 'COPD List Size']
+    ].mean().round(1)
+
+    # STEP 3: Merge numerator and denominator
+    last_year_means = pd.merge(last_year_sum_numerators, last_year_mean_denominators, on='Practice')
+
+    # STEP 4: Merge into main df, add suffix
+    icb_means_merged = pd.merge(
+        icb_means_merged, last_year_means, on='Practice', suffixes=('', '_lastyear')
+    )
+
+    # STEP 5: Calculate last-year-period rate
+    icb_means_merged[f"{measure_type} (last year)"] = (
+        icb_means_merged[f"{numerator_column}_lastyear"] /
+        icb_means_merged[f"{denominator_column}_lastyear"] * 1000
+    ).round(1)
+
+    # STEP 6: Calculate % CHANGE FROM LAST YEAR
+    icb_means_merged["Δ from last year"] = (
+        (icb_means_merged[measure_type] - icb_means_merged[f"{measure_type} (last year)"]) /
+        icb_means_merged[f"{measure_type} (last year)"] * 100
+    ).round(1)
 
 
 # Round item count
@@ -428,14 +469,27 @@ with col1:
         key="subloc_selector"
     )
 
-
 # Convert selection to a list for filtering
 if selected_sublocation == "Show all":
     selected_sublocations = list(sub_location_colors.keys())
 else:
     selected_sublocations = [selected_sublocation]
 
-# Filter data
+
+# ── Toggle for bar chart y-axis mode ─────────────
+use_delta_chart = False
+use_year_change = False
+if dataset_type != "High Cost Drugs":
+    mode_option = st.radio(
+        "",
+        ["Current rate", "Change from previous 3m", "Change from same 3m last year"],
+        index=0,
+        horizontal=True
+    )
+    use_delta_chart = mode_option == "Change from previous 3m"
+    use_year_change = mode_option == "Change from same 3m last year"
+
+# Filter by selected sublocations for plotting
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
 
 # ── Conditional Practice Dropdown (col2)
@@ -470,25 +524,23 @@ if len(selected_sublocations) > 1 and filtered_colors:
                 unsafe_allow_html=True
             )
 
-# ── Toggle for bar chart y-axis mode ─────────────
-use_delta_chart = False
-if dataset_type != "High Cost Drugs":
-    mode_option = st.radio(
-        "",
-        ["Current rate", "Change from previous 3m"],
-        index=0,
-        horizontal=True
-    )
-    use_delta_chart = mode_option == "Change from previous 3m"
-
 # Determine which column to use for y-axis
 if use_delta_chart:
     y_axis_column = "Δ from previous"
     y_axis_label = f"{dataset_type} {measure_type} Δ from previous 3m"
+elif use_year_change:
+    y_axis_column = "Δ from last year"
+    y_axis_label = f"{dataset_type} {measure_type} Δ from same 3m last year"
 else:
     y_axis_column = measure_type
     y_axis_label = f"{dataset_type} {measure_type}"
 
+delta_column = None
+if dataset_type != "High Cost Drugs":
+    if use_delta_chart:
+        delta_column = "Δ from previous"
+    elif use_year_change:
+        delta_column = "Δ from last year"
 
 
 # Render Bar Chart
@@ -500,7 +552,7 @@ bar_fig = plot_icb_bar_chart(
     dataset_type=dataset_type,
     measure_metadata=measure_metadata,
     selected_practice=selected_practice,
-    delta_column="Δ from previous" if dataset_type != "High Cost Drugs" else None,
+    delta_column=delta_column,
     y_axis_label=y_axis_label
 )
 
