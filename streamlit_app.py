@@ -482,7 +482,7 @@ use_year_change = False
 if dataset_type != "High Cost Drugs":
     mode_option = st.radio(
         "",
-        ["Current Rate (latest 3m)", "Change from previous 3m", "Change from same 3m last year"],
+        ["Current Rate (latest 3m)", "Change from Previous 3m", "Change from Same 3m Last Year"],
         index=0,
         horizontal=True
     )
