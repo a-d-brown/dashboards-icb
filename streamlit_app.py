@@ -454,7 +454,7 @@ icb_data_aggregated[measure_type] = (
 
 # ── Bar Chart Section ─────────────────────────────
 
-st.header(f'Practice comparisons (latest 3m): {dataset_type} - {measure_type}')
+st.header(f'Practice comparisons: {dataset_type} - {measure_type}')
 
 # Two-column layout for sublocation and practice selector
 col1, col2 = st.columns([2, 2])
@@ -482,7 +482,7 @@ use_year_change = False
 if dataset_type != "High Cost Drugs":
     mode_option = st.radio(
         "",
-        ["Current rate", "Change from previous 3m", "Change from same 3m last year"],
+        ["Current Rate (latest 3m)", "Change from previous 3m", "Change from same 3m last year"],
         index=0,
         horizontal=True
     )
