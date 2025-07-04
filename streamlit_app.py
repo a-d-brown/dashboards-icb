@@ -486,8 +486,8 @@ if dataset_type != "High Cost Drugs":
         index=0,
         horizontal=True
     )
-    use_delta_chart = mode_option == "Change from previous 3m"
-    use_year_change = mode_option == "Change from same 3m last year"
+    use_delta_chart = mode_option == "Change from Previous 3m"
+    use_year_change = mode_option == "Change from Same 3m Last Year"
 
 # Filter by selected sublocations for plotting
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
