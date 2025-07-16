@@ -1,8 +1,4 @@
 ﻿Year Month,Country,BNF Chemical Substance plus Code,Items,Actual Cost,ADQ Usage,DDD Usage,List Size
-202305,ENGLAND,BeclometDiprop/Formoterol/Glycopyrronium (Corticosteroids) (0302000AA),205461,9507106.40812573,,,62604001
-202305,ENGLAND,Mometasone/glycopyrronium/indacaterol (0302000W0),1137,50928.0487766579,,,62604001
-202305,ENGLAND,Formoterol/glycopyrronium/budesonide (0302000Y0),8202,372689.767615275,,,62604001
-202305,ENGLAND,Fluticasone/umeclidinium/vilanterol (0302000Z0),117564,5617193.23141116,,,62604001
 202306,ENGLAND,BeclometDiprop/Formoterol/Glycopyrronium (Corticosteroids) (0302000AA),214365,9898163.98783774,,,62671533
 202306,ENGLAND,Mometasone/glycopyrronium/indacaterol (0302000W0),1360,60729.7311182434,,,62671533
 202306,ENGLAND,Formoterol/glycopyrronium/budesonide (0302000Y0),9066,412247.307944888,,,62671533
@@ -95,3 +91,7 @@
 202504,ENGLAND,Mometasone/glycopyrronium/indacaterol (0302000W0),2227,105368.76649097,,,63829070
 202504,ENGLAND,Formoterol/glycopyrronium/budesonide (0302000Y0),28130,1281623.86528979,,,63829070
 202504,ENGLAND,Fluticasone/umeclidinium/vilanterol (0302000Z0),129875,6300923.98788812,,,63829070
+202505,ENGLAND,BeclometDiprop/Formoterol/Glycopyrronium (Corticosteroids) (0302000AA),301599,14719233.8830462,,,63849271
+202505,ENGLAND,Mometasone/glycopyrronium/indacaterol (0302000W0),2286,107526.925808186,,,63849271
+202505,ENGLAND,Formoterol/glycopyrronium/budesonide (0302000Y0),29694,1357193.46936301,,,63849271
+202505,ENGLAND,Fluticasone/umeclidinium/vilanterol (0302000Z0),134076,6517351.56219853,,,63849271
