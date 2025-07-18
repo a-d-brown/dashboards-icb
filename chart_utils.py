@@ -357,11 +357,14 @@ def plot_high_cost_drugs_scatter(hcd_df, selected_practice):
         x="Items",
         y="Actual Cost",
         hover_name="Label",
-        labels={"Actual Cost": "Actual Cost (£)", "Items": "Items"}
+        labels={"Actual Cost": "Spend (£)", "Items": "Items"}
     )
 
     fig.update_traces(marker=dict(opacity=0.7, line=dict(width=1, color='DarkSlateGrey')))
-    fig.update_layout(height=700)
+    fig.update_layout(
+        height=700,
+        yaxis_title="Spend (£)"
+    )
 
     return fig
 
