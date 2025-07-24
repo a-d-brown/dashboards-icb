@@ -333,14 +333,22 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     return fig
 
 
-def plot_high_cost_drugs_scatter(hcd_df, selected_practice):
-    # Filter to selected practice
-    df = hcd_df[hcd_df["Practice"] == selected_practice].copy()
+def plot_high_cost_drugs_scatter(hcd_df, selected_unit, mode="practice"):
+    if hcd_df.empty:
+        return None  # graceful fail
+
+    # Determine grouping
+    if mode == "practice":
+        df = hcd_df[hcd_df["Practice"] == selected_unit].copy()
+    elif mode == "sublocation":
+        df = hcd_df.copy()
+    else:
+        raise ValueError("Invalid mode. Use 'practice' or 'sublocation'.")
 
     if df.empty:
-        return None  # graceful fail if no data
+        return None
 
-    # Aggregate by BNF Presentation plus Code
+    # Group by BNF Presentation + Code
     summary = (
         df.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
         .sum()
@@ -348,10 +356,8 @@ def plot_high_cost_drugs_scatter(hcd_df, selected_practice):
         .head(100)
     )
 
-    # Explicitly assign the presentation name to a label column (in case hover_name fails)
     summary["Label"] = summary["BNF Presentation plus Code"]
 
-    # Generate scatter plot
     fig = px.scatter(
         summary,
         x="Items",
@@ -367,5 +373,3 @@ def plot_high_cost_drugs_scatter(hcd_df, selected_practice):
     )
 
     return fig
-
-

@@ -275,6 +275,33 @@ with col2:
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
+# ── Filter High Cost Drugs to those used in <50% of practices ──────────────
+if dataset_type == "High Cost Drugs":
+    all_hcd_data = icb_data_preprocessed.copy()
+
+    # Total number of unique practices
+    total_practices = all_hcd_data["Practice"].nunique()
+    threshold = total_practices * 0.5
+
+    # Count how many practices prescribe each drug
+    hcd_practice_counts = (
+        all_hcd_data.groupby("BNF Presentation plus Code")["Practice"]
+        .nunique()
+        .reset_index()
+        .rename(columns={"Practice": "num_practices"})
+    )
+
+    # Filter to only those under threshold
+    low_distribution_drugs = hcd_practice_counts[
+        hcd_practice_counts["num_practices"] < threshold
+    ]["BNF Presentation plus Code"]
+
+    # Apply this filter globally
+    icb_data_preprocessed = icb_data_preprocessed[
+        icb_data_preprocessed["BNF Presentation plus Code"].isin(low_distribution_drugs)
+    ]
+
+
 # Decide which numerator and denominator column to use
 numerator_column = measure_metadata[measure_type]["numerator_column"]
 denominator_column = measure_metadata[measure_type]["denominator_column"]
@@ -566,14 +593,49 @@ st.markdown("---")
 if dataset_type == "High Cost Drugs":
     if selected_practice:
         st.header(f'Top 100 High Cost Drugs (latest 3m) at {selected_practice}')
-
-        # Use already loaded and correct data
         scatter_fig = plot_high_cost_drugs_scatter(icb_data_preprocessed, selected_practice)
-
         if scatter_fig:
             st.plotly_chart(scatter_fig, use_container_width=True)
         else:
             st.info("No data available for the selected practice.")
+    
+    elif selected_sublocation != "Show all":
+        st.header(f"Top 100 High Cost Drugs (latest 3m) in {selected_sublocation}")
+
+        subloc_data = icb_data_preprocessed[
+            icb_data_preprocessed["sub_location"].str.strip().str.casefold()
+            == selected_sublocation.strip().casefold()
+        ].copy()
+
+        # Plot scatter
+        scatter_fig = plot_high_cost_drugs_scatter(subloc_data, selected_sublocation, mode="sublocation")
+        if scatter_fig:
+            st.plotly_chart(scatter_fig, use_container_width=True)
+        else:
+            st.info("No data available for the selected sublocation.")
+
+        # Get top 100 BNF presentation names
+        top_presentations = (
+            subloc_data.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
+            .sum()
+            .sort_values("Actual Cost", ascending=False)
+            .head(100)["BNF Presentation plus Code"]
+            .sort_values()
+            .tolist()
+        )
+
+        selected_presentation = st.selectbox("Select a drug to view practice-level breakdown:", top_presentations)
+
+        if selected_presentation:
+            num_practices = subloc_data[subloc_data["BNF Presentation plus Code"] == selected_presentation]["Practice"].nunique()
+            st.subheader(f"{num_practices} practices prescribe {selected_presentation}")
+            practice_breakdown = (
+                subloc_data[subloc_data["BNF Presentation plus Code"] == selected_presentation]
+                .groupby("Practice", as_index=False)[["Actual Cost", "Items"]]
+                .sum()
+                .sort_values("Actual Cost", ascending=False)
+            )
+            st.dataframe(practice_breakdown, use_container_width=True, hide_index=True)
 
 else:
 
@@ -644,7 +706,3 @@ else:
         if current_params != new_params and not st.session_state.query_updated:
             st.query_params.update(new_params)
             st.session_state.query_updated = True
-
-
-
-
