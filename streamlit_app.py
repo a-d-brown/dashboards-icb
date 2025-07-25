@@ -592,27 +592,72 @@ st.markdown("---")
 # ── Trend / Scatter Chart Section ─────────────────────────
 if dataset_type == "High Cost Drugs":
     if selected_practice:
-        st.header(f'Top 100 High Cost Drugs (latest 3m) at {selected_practice}')
-        scatter_fig = plot_high_cost_drugs_scatter(icb_data_preprocessed, selected_practice)
-        if scatter_fig:
-            st.plotly_chart(scatter_fig, use_container_width=True)
-        else:
-            st.info("No data available for the selected practice.")
+        st.header(f"Top 100 High Cost Drugs (latest 3m) at {selected_practice}")
+
+        view_mode = st.radio(
+            "Select view",
+            options=["View as scatterplot", "View as table"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        if view_mode == "View as scatterplot":
+            scatter_fig = plot_high_cost_drugs_scatter(icb_data_preprocessed, selected_practice)
+            if scatter_fig:
+                st.plotly_chart(scatter_fig, use_container_width=True)
+            else:
+                st.info("No data available for the selected practice.")
+
+        elif view_mode == "View as table":
+            # Filter for selected practice
+            practice_data = icb_data_preprocessed[
+                icb_data_preprocessed["Practice"] == selected_practice
+            ].copy()    
+            
+            # Get top 100 BNF presentation names
+            top_presentations = (
+                practice_data.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
+                .sum()
+                .sort_values("Actual Cost", ascending=False)
+                .head(100)["BNF Presentation plus Code"]
+                .sort_values()
+                .tolist()
+            )
+
+            # Create table data for the top 100 drugs
+            top_drugs_table = (
+                practice_data[practice_data["BNF Presentation plus Code"].isin(top_presentations)]
+                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items", "3m Average Cost per Item"]]
+                .sum()
+                .sort_values("Actual Cost", ascending=False)
+            )
+
+            # Apply styling to the '3m Average Cost per Item' column
+            styled_table = top_drugs_table.style \
+                .format({
+                    "Actual Cost": "£{:,.0f}",
+                    "Items": "{:,.0f}",
+                    "3m Average Cost per Item": "£{:,.0f}"
+                }) \
+                .background_gradient(subset=["3m Average Cost per Item"], cmap="Reds")
+
+            st.dataframe(styled_table, use_container_width=True, hide_index=True)
+
     
     elif selected_sublocation != "Show all":
         st.header(f"Top 100 High Cost Drugs (latest 3m) in {selected_sublocation}")
 
+        view_mode = st.radio(
+            "Select view",
+            options=["View as scatterplot", "View as table"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        # Define subloc_data before branching views
         subloc_data = icb_data_preprocessed[
             icb_data_preprocessed["sub_location"].str.strip().str.casefold()
             == selected_sublocation.strip().casefold()
         ].copy()
-
-        # Plot scatter
-        scatter_fig = plot_high_cost_drugs_scatter(subloc_data, selected_sublocation, mode="sublocation")
-        if scatter_fig:
-            st.plotly_chart(scatter_fig, use_container_width=True)
-        else:
-            st.info("No data available for the selected sublocation.")
 
         # Get top 100 BNF presentation names
         top_presentations = (
@@ -622,7 +667,38 @@ if dataset_type == "High Cost Drugs":
             .head(100)["BNF Presentation plus Code"]
             .sort_values()
             .tolist()
-        )
+            )
+
+        if view_mode == "View as scatterplot":
+            # Plot scatter
+            scatter_fig = plot_high_cost_drugs_scatter(subloc_data, selected_sublocation, mode="sublocation")
+            if scatter_fig:
+                st.plotly_chart(scatter_fig, use_container_width=True)
+            else:
+                st.info("No data available for the selected sublocation.")
+
+        elif view_mode == "View as table":
+            # Create table data for the top 100 drugs
+            top_drugs_table = (
+                subloc_data[subloc_data["BNF Presentation plus Code"].isin(top_presentations)]
+                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items", "3m Average Cost per Item"]]
+                .sum()
+                .sort_values("Actual Cost", ascending=False)
+            )
+
+            # Apply styling to the '3m Average Cost per Item' column
+            styled_table = top_drugs_table.style \
+                .format({
+                    "Actual Cost": "£{:,.0f}",
+                    "Items": "{:,.0f}",
+                    "3m Average Cost per Item": "£{:,.0f}"
+                }) \
+                .background_gradient(subset=["3m Average Cost per Item"], cmap="Reds")
+
+
+            # Display the styled table in Streamlit
+            st.dataframe(styled_table, use_container_width=True, hide_index=True)
+
 
         selected_presentation = st.selectbox("Select a drug to view practice-level breakdown:", top_presentations)
 
@@ -635,7 +711,12 @@ if dataset_type == "High Cost Drugs":
                 .sum()
                 .sort_values("Actual Cost", ascending=False)
             )
-            st.dataframe(practice_breakdown, use_container_width=True, hide_index=True)
+            styled_practice_breakdown = practice_breakdown.style \
+                .format({
+                    "Actual Cost": "£{:,.0f}",
+                    "Items": "{:,.0f}",
+                })
+            st.dataframe(styled_practice_breakdown, use_container_width=True, hide_index=True)
 
 else:
 
