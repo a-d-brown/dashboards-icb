@@ -333,33 +333,14 @@ def plot_line_chart(icb_data_raw_merged, national_data_raw_merged, sub_location,
     return fig
 
 
-def plot_high_cost_drugs_scatter(hcd_df, selected_unit, mode="practice"):
-    if hcd_df.empty:
-        return None  # graceful fail
-
-    # Determine grouping
-    if mode == "practice":
-        df = hcd_df[hcd_df["Practice"] == selected_unit].copy()
-    elif mode == "sublocation":
-        df = hcd_df.copy()
-    else:
-        raise ValueError("Invalid mode. Use 'practice' or 'sublocation'.")
-
-    if df.empty:
+def plot_high_cost_drugs_scatter(summary_df):
+    if summary_df.empty:
         return None
 
-    # Group by BNF Presentation + Code
-    summary = (
-        df.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
-        .sum()
-        .sort_values("Actual Cost", ascending=False)
-        .head(100)
-    )
-
-    summary["Label"] = summary["BNF Presentation plus Code"]
+    summary_df["Label"] = summary_df["BNF Presentation plus Code"]
 
     fig = px.scatter(
-        summary,
+        summary_df,
         x="Items",
         y="Actual Cost",
         hover_name="Label",
@@ -367,9 +348,7 @@ def plot_high_cost_drugs_scatter(hcd_df, selected_unit, mode="practice"):
     )
 
     fig.update_traces(marker=dict(opacity=0.7, line=dict(width=1, color='DarkSlateGrey')))
-    fig.update_layout(
-        height=700,
-        yaxis_title="Spend (£)"
-    )
+    fig.update_layout(height=700, yaxis_title="Spend (£)")
 
     return fig
+
