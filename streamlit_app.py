@@ -629,12 +629,18 @@ if dataset_type == "High Cost Drugs":
                 st.info("No data available for the selected practice.")
 
         elif view_mode == "View as table":
-            top_drugs_table = (
+            top_drugs_grouped = (
                 practice_data[practice_data["BNF Presentation plus Code"].isin(top_presentations)]
-                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items", "3m Average Cost per Item"]]
+                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items"]]
                 .sum()
-                .sort_values("Actual Cost", ascending=False)
             )
+
+            top_drugs_grouped["3m Average Cost per Item"] = (
+                top_drugs_grouped["Actual Cost"] / top_drugs_grouped["Items"]
+            )
+
+            top_drugs_table = top_drugs_grouped.sort_values("Actual Cost", ascending=False)
+
 
             styled_table = top_drugs_table.style \
                 .format({
@@ -684,12 +690,17 @@ if dataset_type == "High Cost Drugs":
                 st.info("No data available for the selected sublocation.")
 
         elif view_mode == "View as table":
-            top_drugs_table = (
+            top_drugs_grouped = (
                 subloc_data[subloc_data["BNF Presentation plus Code"].isin(top_presentations)]
-                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items", "3m Average Cost per Item"]]
+                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items"]]
                 .sum()
-                .sort_values("Actual Cost", ascending=False)
             )
+
+            top_drugs_grouped["3m Average Cost per Item"] = (
+                top_drugs_grouped["Actual Cost"] / top_drugs_grouped["Items"]
+            )
+
+            top_drugs_table = top_drugs_grouped.sort_values("Actual Cost", ascending=False)
 
             styled_table = top_drugs_table.style \
                 .format({
