@@ -272,6 +272,20 @@ with col2:
         index=default_measure_index
     )
 
+    # Show cost-per-item slider if High Cost Drugs is selected
+    if dataset_type == "High Cost Drugs":
+        cost_filter_threshold = st.slider(
+            "Minimum Cost per Item to include",
+            min_value=25.0,
+            max_value=3000.0,
+            value=25.0,
+            step=25.0,
+            format="£%0.0f"
+        )
+    else:
+        cost_filter_threshold = None
+
+
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
@@ -300,6 +314,12 @@ if dataset_type == "High Cost Drugs":
     icb_data_preprocessed = icb_data_preprocessed[
         icb_data_preprocessed["BNF Presentation plus Code"].isin(low_distribution_drugs)
     ]
+
+    # Apply cost filter if slider threshold is set
+    if cost_filter_threshold is not None:
+        icb_data_preprocessed = icb_data_preprocessed[
+            icb_data_preprocessed["3m Average Cost per Item"] >= cost_filter_threshold
+        ]
 
 
 # Decide which numerator and denominator column to use
