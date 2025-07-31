@@ -275,7 +275,7 @@ with col2:
     # Show cost-per-item slider if High Cost Drugs is selected
     if dataset_type == "High Cost Drugs":
         cost_filter_threshold = st.slider(
-            "Minimum Cost per Item to include",
+            "Minimum Cost per Item to include:",
             min_value=25.0,
             max_value=3000.0,
             value=25.0,
