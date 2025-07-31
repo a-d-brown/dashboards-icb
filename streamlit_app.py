@@ -217,54 +217,61 @@ copd_list_size_df = copd_list_size_df[['Practice', 'COPD Register']]
 copd_list_size_df.rename(columns={'COPD Register': 'COPD List Size'}, inplace=True)
 
 
-## ── UI: Header and Select Boxes ────────────────
-col1, col2 = st.columns([3, 1]) # two column layout
 
-with col1:
+
+# 🔧 REFACTORED UI SELECTORS (stacked layout: left=sub/practice, right=dataset/measure)
+# ── 3-Column Header Layout ─────────────────────────────
+col1_title, col2_subloc, col3_dataset = st.columns([2.5, 1.5, 1.5])
+
+# ── COLUMN 1: Title + Badge ─────────────────────────────
+with col1_title:
     st.markdown("""
-        <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-        ">
-            <div style="
-                font-size: clamp(20px, 4vw, 36px);
-                font-weight: bold;
-            ">
+        <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 1rem;">
+            <div style="font-size: clamp(20px, 4vw, 36px); font-weight: bold;">
                 NENC Medicines Optimisation Workstream Dashboard
             </div>
-            <div style="
-                background-color: #ffc107;
-                color: black;
-                font-size: 0.9em;
-                font-weight: bold;
-                padding: 2px 8px;
-                border-radius: 4px;
-                margin-top: 0.3em;
-            ">
+            <div style="background-color: #ffc107; color: black; font-size: 0.9em; font-weight: bold; padding: 2px 8px; border-radius: 4px; margin-top: 0.3em;">
                 BETA
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-with col2:
+# ── COLUMN 2: Sub-location + Practice ───────────────────
+with col2_subloc:
+    st.markdown("### Filter by Location")
+    
+    subloc_options = ["Show all"] + list(sub_location_colors.keys())
+    selected_sublocation = st.selectbox(
+        "Select Sub-location:",
+        options=subloc_options,
+        index=subloc_options.index(initial_subloc) if initial_subloc in subloc_options else 0,
+        key="subloc_selector"
+    )
+
+    if selected_sublocation == "Show all":
+        selected_sublocations = list(sub_location_colors.keys())
+    else:
+        selected_sublocations = [selected_sublocation]
+
+# 👇 Practice dropdown appears later (after data is loaded), but still in col2_subloc
+# Just reuse `with col2_subloc:` later in the script when you're ready to render it
+
+# ── COLUMN 3: Dataset + Measure + Cost Slider ─────────────
+with col3_dataset:
+    st.markdown("### Select Dataset and Measure")
+
     dataset_type = st.selectbox(
         "Select Dataset:",
         options=list(dataset_measures.keys()),
         index=list(dataset_measures.keys()).index(initial_dataset)
     )
 
-    # Assign measure options from central map
     measure_options = dataset_measures.get(dataset_type, [])
-
-    # If the initial_measure is valid for this dataset, keep it. Otherwise, reset to first option.
-    if initial_measure in measure_options:
-        default_measure_index = measure_options.index(initial_measure)
-        resolved_measure = initial_measure
-    else:
-        default_measure_index = 0
-        resolved_measure = measure_options[0]  # fallback to first valid measure
+    default_measure_index = (
+        measure_options.index(initial_measure)
+        if initial_measure in measure_options
+        else 0
+    )
 
     measure_type = st.selectbox(
         "Select Measure:",
@@ -272,7 +279,6 @@ with col2:
         index=default_measure_index
     )
 
-    # Show cost-per-item slider if High Cost Drugs is selected
     if dataset_type == "High Cost Drugs":
         cost_filter_threshold = st.slider(
             "Minimum Cost per Item to include:",
@@ -284,6 +290,7 @@ with col2:
         )
     else:
         cost_filter_threshold = None
+
 
 
 ## ── Data Loading ───────────────────────────────
@@ -487,6 +494,27 @@ total_numerator = sum_numerators[numerator_column].sum()
 total_denominator = mean_denominators[denominator_column].sum()
 icb_average_value = (total_numerator / total_denominator) * 1000
 
+# Set practice dropdown now that icb_means_merged is available (dynamic filtering of options)
+with col2_subloc:
+    selected_practice = None
+    if selected_sublocation != "Show all":
+        practices = icb_means_merged[
+            icb_means_merged['sub_location'].isin(selected_sublocations)
+        ]['Practice'].sort_values().unique()
+
+        practice_options = ["None"] + list(practices)
+        default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
+
+        selected_practice_option = st.selectbox(
+            "Select Practice:",
+            options=practice_options,
+            index=default_index
+        )
+
+        if selected_practice_option != "None":
+            selected_practice = selected_practice_option
+
+
 
 # ── Line chart: Calculate Monthly Rate Columns ──────────
 
@@ -497,24 +525,12 @@ icb_data_aggregated[measure_type] = (
 
 
 
+
 ### STREAMLIT LAYOUT ------------
 
 # ── Bar Chart Section ─────────────────────────────
 
 st.header(f'Practice comparisons: {dataset_type} - {measure_type}')
-
-# Two-column layout for sublocation and practice selector
-col1, col2 = st.columns([2, 2])
-
-# ── Sub-location Dropdown (col1)
-with col1:
-    subloc_options = ["Show all"] + list(sub_location_colors.keys())
-    selected_sublocation = st.selectbox(
-        "Select Sub-location:",
-        options=subloc_options,
-        index=subloc_options.index(initial_subloc) if initial_subloc in subloc_options else 0,
-        key="subloc_selector"
-    )
 
 # Convert selection to a list for filtering
 if selected_sublocation == "Show all":
@@ -538,23 +554,6 @@ if dataset_type != "High Cost Drugs":
 
 # Filter by selected sublocations for plotting
 filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
-
-# ── Conditional Practice Dropdown (col2)
-selected_practice = None
-with col2:
-    if selected_sublocation != "Show all":
-        practices = filtered_data['Practice'].sort_values().unique()
-        practice_options = ["None"] + list(practices)
-        default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
-
-        selected_practice_option = st.selectbox(
-            "Select Practice:",
-            options=practice_options,
-            index=default_index
-        )
-
-        if selected_practice_option != "None":
-            selected_practice = selected_practice_option
 
 
 # ── Legend (only when multiple sublocations)
