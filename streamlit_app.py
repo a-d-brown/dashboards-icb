@@ -635,7 +635,7 @@ if dataset_type == "High Cost Drugs":
                 .sum()
             )
 
-            top_drugs_grouped["3m Average Cost per Item"] = (
+            top_drugs_grouped["Average Cost per Item"] = (
                 top_drugs_grouped["Actual Cost"] / top_drugs_grouped["Items"]
             )
 
@@ -646,9 +646,9 @@ if dataset_type == "High Cost Drugs":
                 .format({
                     "Actual Cost": "£{:,.0f}",
                     "Items": "{:,.0f}",
-                    "3m Average Cost per Item": "£{:,.0f}"
+                    "Average Cost per Item": "£{:,.0f}"
                 }) \
-                .background_gradient(subset=["3m Average Cost per Item"], cmap="Reds")
+                .background_gradient(subset=["Average Cost per Item"], cmap="Reds")
 
             st.dataframe(styled_table, use_container_width=True, hide_index=True)
 
@@ -696,7 +696,7 @@ if dataset_type == "High Cost Drugs":
                 .sum()
             )
 
-            top_drugs_grouped["3m Average Cost per Item"] = (
+            top_drugs_grouped["Average Cost per Item"] = (
                 top_drugs_grouped["Actual Cost"] / top_drugs_grouped["Items"]
             )
 
@@ -706,9 +706,9 @@ if dataset_type == "High Cost Drugs":
                 .format({
                     "Actual Cost": "£{:,.0f}",
                     "Items": "{:,.0f}",
-                    "3m Average Cost per Item": "£{:,.0f}"
+                    "Average Cost per Item": "£{:,.0f}"
                 }) \
-                .background_gradient(subset=["3m Average Cost per Item"], cmap="Reds")
+                .background_gradient(subset=["Average Cost per Item"], cmap="Reds")
 
             st.dataframe(styled_table, use_container_width=True, hide_index=True)
 
