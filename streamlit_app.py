@@ -221,7 +221,7 @@ copd_list_size_df.rename(columns={'COPD Register': 'COPD List Size'}, inplace=Tr
 
 # 🔧 REFACTORED UI SELECTORS (stacked layout: left=sub/practice, right=dataset/measure)
 # ── 3-Column Header Layout ─────────────────────────────
-col1_title, col2_subloc, col3_dataset = st.columns([2.5, 1.5, 1.5])
+col1_title, col2_subloc, col_divider, col3_dataset = st.columns([2.5, 1.4, 0.05, 1.4])
 
 # ── COLUMN 1: Title + Badge ─────────────────────────────
 with col1_title:
@@ -237,9 +237,7 @@ with col1_title:
     """, unsafe_allow_html=True)
 
 # ── COLUMN 2: Sub-location + Practice ───────────────────
-with col2_subloc:
-    st.markdown("### Filter by Location")
-    
+with col2_subloc:   
     subloc_options = ["Show all"] + list(sub_location_colors.keys())
     selected_sublocation = st.selectbox(
         "Select Sub-location:",
@@ -253,13 +251,19 @@ with col2_subloc:
     else:
         selected_sublocations = [selected_sublocation]
 
-# 👇 Practice dropdown appears later (after data is loaded), but still in col2_subloc
-# Just reuse `with col2_subloc:` later in the script when you're ready to render it
+# Practice dropdown appears later (after data is loaded), but still in col2_subloc
+
+# COLUMN DIVIDER
+with col_divider:
+    st.markdown(
+        """
+        <div style="min-height: 160px; border-left: 1px solid #ddd; margin: 0 8px;"></div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # ── COLUMN 3: Dataset + Measure + Cost Slider ─────────────
 with col3_dataset:
-    st.markdown("### Select Dataset and Measure")
-
     dataset_type = st.selectbox(
         "Select Dataset:",
         options=list(dataset_measures.keys()),
