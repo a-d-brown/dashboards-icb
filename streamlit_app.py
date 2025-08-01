@@ -219,7 +219,7 @@ copd_list_size_df.rename(columns={'COPD Register': 'COPD List Size'}, inplace=Tr
 
 
 
-# 🔧 REFACTORED UI SELECTORS (stacked layout: left=sub/practice, right=dataset/measure)
+# UI SELECTORS
 # ── 3-Column Header Layout ─────────────────────────────
 col1_title, col2_subloc, col_divider, col3_dataset = st.columns([2.5, 1.4, 0.05, 1.4])
 
@@ -740,7 +740,7 @@ if dataset_type == "High Cost Drugs":
         if selected_presentation:
             subset = subloc_data[subloc_data["BNF Presentation plus Code"] == selected_presentation]
             num_practices = subset["Practice"].nunique()
-            st.subheader(f"{num_practices} practices prescribe {selected_presentation}")
+            st.subheader(f"{num_practices} practices in {selected_sublocation} prescribe {selected_presentation}")
 
             practice_breakdown = (
                 subset.groupby("Practice", as_index=False)[["Actual Cost", "Items"]]
@@ -753,6 +753,86 @@ if dataset_type == "High Cost Drugs":
                     "Actual Cost": "£{:,.0f}",
                     "Items": "{:,.0f}",
                 })
+
+            st.dataframe(styled_practice_breakdown, use_container_width=True, hide_index=True)
+    
+    elif selected_sublocation and selected_sublocation == "Show all":
+        st.header(f"Top 100 High Cost Drugs (latest 3m) across NENC")
+
+        view_mode = st.radio(
+            "Select view",
+            options=["View as scatterplot", "View as table"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        # Get top 100 BNF presentation names
+        top_presentations = (
+            icb_data_preprocessed.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
+            .sum()
+            .sort_values("Actual Cost", ascending=False)
+            .head(100)["BNF Presentation plus Code"]
+            .sort_values()
+            .tolist()
+        )
+
+        if view_mode == "View as scatterplot":
+            top100_summary = (
+                icb_data_preprocessed[icb_data_preprocessed["BNF Presentation plus Code"].isin(top_presentations)]
+                .groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
+                .sum()
+                .sort_values("Actual Cost", ascending=False)
+            )
+            scatter_fig = plot_high_cost_drugs_scatter(top100_summary)
+            if scatter_fig:
+                st.plotly_chart(scatter_fig, use_container_width=True)
+            else:
+                st.info("No data available for the selected sublocation.")
+
+        elif view_mode == "View as table":
+            top_drugs_grouped = (
+                icb_data_preprocessed[icb_data_preprocessed["BNF Presentation plus Code"].isin(top_presentations)]
+                .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items"]]
+                .sum()
+            )
+
+            top_drugs_grouped["Average Cost per Item"] = (
+                top_drugs_grouped["Actual Cost"] / top_drugs_grouped["Items"]
+            )
+
+            top_drugs_table = top_drugs_grouped.sort_values("Actual Cost", ascending=False)
+
+            styled_table = top_drugs_table.style \
+                .format({
+                    "Actual Cost": "£{:,.0f}",
+                    "Items": "{:,.0f}",
+                    "Average Cost per Item": "£{:,.0f}"
+                }) \
+                .background_gradient(subset=["Average Cost per Item"], cmap="Reds")
+
+            st.dataframe(styled_table, use_container_width=True, hide_index=True)
+
+        selected_presentation = st.selectbox("Select a drug to view practice-level breakdown:", top_presentations)
+
+        if selected_presentation:
+            subset = icb_data_preprocessed[icb_data_preprocessed["BNF Presentation plus Code"] == selected_presentation]
+            num_practices = subset["Practice"].nunique()
+            st.subheader(f"{num_practices} practices in NENC prescribe {selected_presentation}")
+
+            practice_breakdown = (
+                subset.groupby("Practice", as_index=False)[["sub_location", "Actual Cost", "Items"]]
+                .sum()
+                .sort_values("Actual Cost", ascending=False)
+            )
+            practice_breakdown_display = practice_breakdown.rename(columns={"sub_location": "Sub-location"})
+
+            styled_practice_breakdown = practice_breakdown_display.style \
+                .format({
+                    "Actual Cost": "£{:,.0f}",
+                    "Items": "{:,.0f}",
+                }) \
+                .set_properties(**{"text-align": "left"})
+
 
             st.dataframe(styled_practice_breakdown, use_container_width=True, hide_index=True)
 
