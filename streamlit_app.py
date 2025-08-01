@@ -300,17 +300,38 @@ with col3_dataset:
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
+# Decide which numerator and denominator column to use
+numerator_column = measure_metadata[measure_type]["numerator_column"]
+denominator_column = measure_metadata[measure_type]["denominator_column"]
+
+# Early filter to determine practices with recent data for dynamic dropdown options
+early_recent_practices = (
+    icb_data_preprocessed[icb_data_preprocessed["period_tag"] == "recent"]
+    .groupby("Practice", as_index=False)
+    .agg({"sub_location": "first"})  # assumes each practice maps to one sublocation
+)
 
 # Set practice dropdown now that icb_means_merged is available (dynamic filtering of options)
 with col2_subloc:
     selected_practice = None
-    if selected_sublocation != "Show all":
-        practices = icb_data_preprocessed[
-            icb_data_preprocessed['sub_location'].isin(selected_sublocations)
-        ]['Practice'].sort_values().unique()
 
-        practice_options = ["None"] + list(practices)
-        default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
+    if selected_sublocation != "Show all":
+        # Step 1: Filter to recent, active data in the selected sublocation
+        recent_active = icb_data_preprocessed[
+            (icb_data_preprocessed["period_tag"] == "recent") &
+            (icb_data_preprocessed[numerator_column] > 0) &
+            (icb_data_preprocessed["sub_location"].isin(selected_sublocations))
+        ]
+
+        # Step 2: Get sorted list of practices with recent activity
+        recent_practices = recent_active["Practice"].dropna().sort_values().unique()
+
+        # Step 3: Build dropdown
+        practice_options = ["None"] + list(recent_practices)
+        default_index = (
+            practice_options.index(initial_highlight)
+            if initial_highlight in practice_options else 0
+        )
 
         selected_practice_option = st.selectbox(
             "Select Practice:",
@@ -320,6 +341,8 @@ with col2_subloc:
 
         if selected_practice_option != "None":
             selected_practice = selected_practice_option
+
+
 
 
 # ── Filter High Cost Drugs to those used in <50% of practices ──────────────
@@ -343,12 +366,10 @@ if dataset_type == "High Cost Drugs":
         hcd_practice_counts["num_practices"] < threshold
     ]["BNF Presentation plus Code"]
 
-    # Apply this filter globally
+    # Apply <50% filter globally
     icb_data_preprocessed = icb_data_preprocessed[
         icb_data_preprocessed["BNF Presentation plus Code"].isin(low_distribution_drugs)
     ]
-
-
 
     # Apply cost filter if slider threshold is set to define custom subsets for deep dive display in scatters/tables
     if cost_filter_threshold is not None:
@@ -387,9 +408,6 @@ if dataset_type == "High Cost Drugs":
             icb_data_preprocessed["3m Average Cost per Item"] >= cost_filter_threshold
         ]
 
-# Decide which numerator and denominator column to use
-numerator_column = measure_metadata[measure_type]["numerator_column"]
-denominator_column = measure_metadata[measure_type]["denominator_column"]
 
 # Merge and filter COPD List Size if needed
 if dataset_type != "High Cost Drugs":
@@ -554,15 +572,12 @@ icb_average_value = (total_numerator / total_denominator) * 1000
 
 
 
-
-
 # ── Line chart: Calculate Monthly Rate Columns ──────────
 
 # Calculate monthly rates for ICB data
 icb_data_aggregated[measure_type] = (
     (icb_data_aggregated[numerator_column] / icb_data_aggregated[denominator_column]) * 1000
 ).round(1)
-
 
 
 
@@ -593,8 +608,10 @@ if dataset_type != "High Cost Drugs":
     use_year_change = mode_option == "Change from Same 3m Last Year"
 
 # Filter by selected sublocations for plotting
-filtered_data = icb_means_merged[icb_means_merged['sub_location'].isin(selected_sublocations)]
-
+filtered_data = icb_means_merged[
+    (icb_means_merged['sub_location'].isin(selected_sublocations)) &
+    (icb_means_merged[numerator_column] > 0)  # don't plot bar if numerator is 0
+]
 
 # ── Legend (only when multiple sublocations)
 filtered_colors = {k: v for k, v in sub_location_colors.items() if k in selected_sublocations}
