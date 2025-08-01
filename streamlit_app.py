@@ -344,7 +344,6 @@ with col2_subloc:
 
 
 
-
 # ── Filter High Cost Drugs to those used in <50% of practices ──────────────
 if dataset_type == "High Cost Drugs":
     all_hcd_data = icb_data_preprocessed.copy()
@@ -610,7 +609,7 @@ if dataset_type != "High Cost Drugs":
 # Filter by selected sublocations for plotting
 filtered_data = icb_means_merged[
     (icb_means_merged['sub_location'].isin(selected_sublocations)) &
-    (icb_means_merged[numerator_column] > 0)  # don't plot bar if numerator is 0
+    (icb_means_merged[measure_type] > 0)  # don't plot bar if numerator is 0
 ]
 
 # ── Legend (only when multiple sublocations)
