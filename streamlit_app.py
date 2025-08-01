@@ -287,7 +287,7 @@ with col3_dataset:
         cost_filter_threshold = st.slider(
             "Minimum Cost per Item to include:",
             min_value=25.0,
-            max_value=3000.0,
+            max_value=2500.0,
             value=25.0,
             step=25.0,
             format="£%0.0f"
@@ -299,6 +299,28 @@ with col3_dataset:
 
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
+
+
+# Set practice dropdown now that icb_means_merged is available (dynamic filtering of options)
+with col2_subloc:
+    selected_practice = None
+    if selected_sublocation != "Show all":
+        practices = icb_data_preprocessed[
+            icb_data_preprocessed['sub_location'].isin(selected_sublocations)
+        ]['Practice'].sort_values().unique()
+
+        practice_options = ["None"] + list(practices)
+        default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
+
+        selected_practice_option = st.selectbox(
+            "Select Practice:",
+            options=practice_options,
+            index=default_index
+        )
+
+        if selected_practice_option != "None":
+            selected_practice = selected_practice_option
+
 
 # ── Filter High Cost Drugs to those used in <50% of practices ──────────────
 if dataset_type == "High Cost Drugs":
@@ -326,12 +348,44 @@ if dataset_type == "High Cost Drugs":
         icb_data_preprocessed["BNF Presentation plus Code"].isin(low_distribution_drugs)
     ]
 
-    # Apply cost filter if slider threshold is set
+
+
+    # Apply cost filter if slider threshold is set to define custom subsets for deep dive display in scatters/tables
+    if cost_filter_threshold is not None:
+        # Step 1: Apply sublocation/practice filters to get the relevant subset
+        if selected_practice:
+            filtered_subset = icb_data_preprocessed[
+                icb_data_preprocessed["Practice"] == selected_practice
+            ]
+        elif selected_sublocation != "Show all":
+            filtered_subset = icb_data_preprocessed[
+                icb_data_preprocessed["sub_location"] == selected_sublocation
+            ]
+        else:
+            filtered_subset = icb_data_preprocessed.copy()
+
+        # Step 2: Calculate average cost per item per drug within that subset
+        avg_cost_per_drug = (
+            filtered_subset
+            .groupby("BNF Presentation plus Code")[["Actual Cost", "Items"]]
+            .sum()
+            .assign(avg_cost_per_item=lambda df: df["Actual Cost"] / df["Items"])
+        )
+
+        high_cost_drugs = avg_cost_per_drug[
+            avg_cost_per_drug["avg_cost_per_item"] >= cost_filter_threshold
+        ].index
+
+        # Step 3: Apply the filter to the full preprocessed dataset
+        high_cost_drug_data_preprocessed = icb_data_preprocessed[
+            icb_data_preprocessed["BNF Presentation plus Code"].isin(high_cost_drugs)
+        ]
+
+    # Apply cost filter if slider threshold is set globally for bar chart
     if cost_filter_threshold is not None:
         icb_data_preprocessed = icb_data_preprocessed[
             icb_data_preprocessed["3m Average Cost per Item"] >= cost_filter_threshold
         ]
-
 
 # Decide which numerator and denominator column to use
 numerator_column = measure_metadata[measure_type]["numerator_column"]
@@ -498,25 +552,7 @@ total_numerator = sum_numerators[numerator_column].sum()
 total_denominator = mean_denominators[denominator_column].sum()
 icb_average_value = (total_numerator / total_denominator) * 1000
 
-# Set practice dropdown now that icb_means_merged is available (dynamic filtering of options)
-with col2_subloc:
-    selected_practice = None
-    if selected_sublocation != "Show all":
-        practices = icb_means_merged[
-            icb_means_merged['sub_location'].isin(selected_sublocations)
-        ]['Practice'].sort_values().unique()
 
-        practice_options = ["None"] + list(practices)
-        default_index = practice_options.index(initial_highlight) if initial_highlight in practice_options else 0
-
-        selected_practice_option = st.selectbox(
-            "Select Practice:",
-            options=practice_options,
-            index=default_index
-        )
-
-        if selected_practice_option != "None":
-            selected_practice = selected_practice_option
 
 
 
@@ -624,8 +660,8 @@ if dataset_type == "High Cost Drugs":
             label_visibility="collapsed"
         )
 
-        practice_data = icb_data_preprocessed[
-            icb_data_preprocessed["Practice"] == selected_practice
+        practice_data = high_cost_drug_data_preprocessed[
+            high_cost_drug_data_preprocessed["Practice"] == selected_practice
         ].copy()
 
         # Get top 100 BNF presentation names by spend
@@ -685,8 +721,8 @@ if dataset_type == "High Cost Drugs":
             label_visibility="collapsed"
         )
 
-        subloc_data = icb_data_preprocessed[
-            icb_data_preprocessed["sub_location"].str.strip().str.casefold() == selected_sublocation.strip().casefold()
+        subloc_data = high_cost_drug_data_preprocessed[
+            high_cost_drug_data_preprocessed["sub_location"].str.strip().str.casefold() == selected_sublocation.strip().casefold()
         ].copy()
 
         # Get top 100 BNF presentation names
@@ -768,7 +804,7 @@ if dataset_type == "High Cost Drugs":
 
         # Get top 100 BNF presentation names
         top_presentations = (
-            icb_data_preprocessed.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
+            high_cost_drug_data_preprocessed.groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
             .sum()
             .sort_values("Actual Cost", ascending=False)
             .head(100)["BNF Presentation plus Code"]
@@ -778,7 +814,7 @@ if dataset_type == "High Cost Drugs":
 
         if view_mode == "View as scatterplot":
             top100_summary = (
-                icb_data_preprocessed[icb_data_preprocessed["BNF Presentation plus Code"].isin(top_presentations)]
+                high_cost_drug_data_preprocessed[high_cost_drug_data_preprocessed["BNF Presentation plus Code"].isin(top_presentations)]
                 .groupby("BNF Presentation plus Code", as_index=False)[["Items", "Actual Cost"]]
                 .sum()
                 .sort_values("Actual Cost", ascending=False)
@@ -791,7 +827,7 @@ if dataset_type == "High Cost Drugs":
 
         elif view_mode == "View as table":
             top_drugs_grouped = (
-                icb_data_preprocessed[icb_data_preprocessed["BNF Presentation plus Code"].isin(top_presentations)]
+                high_cost_drug_data_preprocessed[high_cost_drug_data_preprocessed["BNF Presentation plus Code"].isin(top_presentations)]
                 .groupby("BNF Presentation plus Code", as_index=False)[["Actual Cost", "Items"]]
                 .sum()
             )
@@ -815,7 +851,7 @@ if dataset_type == "High Cost Drugs":
         selected_presentation = st.selectbox("Select a drug to view practice-level breakdown:", top_presentations)
 
         if selected_presentation:
-            subset = icb_data_preprocessed[icb_data_preprocessed["BNF Presentation plus Code"] == selected_presentation]
+            subset = high_cost_drug_data_preprocessed[high_cost_drug_data_preprocessed["BNF Presentation plus Code"] == selected_presentation]
             num_practices = subset["Practice"].nunique()
             st.subheader(f"{num_practices} practices in NENC prescribe {selected_presentation}")
 
