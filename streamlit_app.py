@@ -81,6 +81,7 @@ dataset_measures = {
     "Vitamin D": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "PPIs": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Dicycloverine": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "High Cost Drugs": ["Spend per 1000 Patients", "Items per 1000 Patients"]
 }
 
