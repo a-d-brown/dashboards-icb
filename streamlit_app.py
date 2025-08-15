@@ -672,7 +672,7 @@ if dataset_type == "High Cost Drugs":
 
         view_mode = st.radio(
             "Select view",
-            options=["View as scatterplot", "View as table"],
+            options=["View as table", "View as scatterplot"],
             horizontal=True,
             label_visibility="collapsed"
         )
@@ -733,7 +733,7 @@ if dataset_type == "High Cost Drugs":
 
         view_mode = st.radio(
             "Select view",
-            options=["View as scatterplot", "View as table"],
+            options=["View as table", "View as scatterplot"],
             horizontal=True,
             label_visibility="collapsed"
         )
@@ -814,7 +814,7 @@ if dataset_type == "High Cost Drugs":
 
         view_mode = st.radio(
             "Select view",
-            options=["View as scatterplot", "View as table"],
+            options=["View as table", "View as scatterplot"],
             horizontal=True,
             label_visibility="collapsed"
         )
