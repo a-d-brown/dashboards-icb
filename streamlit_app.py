@@ -188,6 +188,21 @@ def aggregate_substance_data(df, group_cols):
     merged['BNF Chemical Substance plus Code'] = 'Drugs Aggregated'
     return merged
 
+# Compute period aggregates for given period_tag
+def compute_period_aggregates(df, period_tag, dataset_type="Prescribing", group_cols=('Practice',), numerators=None, denominators=None):
+    if numerators is None or denominators is None:
+        if dataset_type == "High Cost Drugs":
+            numerators = ['Actual Cost', 'Items']
+            denominators = ['List Size']
+        else:
+            numerators = ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
+            denominators = ['List Size', 'COPD List Size']
+    subset = df[df['period_tag'] == period_tag]
+    sum_df = subset.groupby(list(group_cols), as_index=False)[numerators].sum().round(1)
+    mean_df = subset.groupby(list(group_cols), as_index=False)[denominators].mean().round(1)
+    agg = pd.merge(sum_df, mean_df, on=list(group_cols))
+    return agg
+
 # Load data based on selected dataset type
 @st.cache_data
 def load_data(dataset_type):
@@ -461,66 +476,37 @@ if national_data_preprocessed is not None:
 else:
     national_data_raw_merged = None
 
-# Filter to latest 3 months
-recent_data = icb_data_aggregated[icb_data_aggregated['period_tag'] == 'recent']
 
-# STEP 1: Sum numerators over latest 3 months
-if dataset_type == "High Cost Drugs":
-    sum_numerators = recent_data.groupby('Practice', as_index=False)[['Actual Cost', 'Items']].sum().round(1)
-else:
-    sum_numerators = recent_data.groupby('Practice', as_index=False)[
-        ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
-    ].sum().round(1)
-
-# STEP 2: Mean denominator (List Size) over latest 3 months
-if dataset_type == "High Cost Drugs":
-    mean_denominators = recent_data.groupby('Practice', as_index=False)[['List Size']].mean().round(1)
-else:
-    mean_denominators = recent_data.groupby('Practice', as_index=False)[['List Size', 'COPD List Size']].mean().round(1)
-
-# STEP 3: Merge together
-means = pd.merge(sum_numerators, mean_denominators, on='Practice')
+# Aggregate latest 3 months
+means = compute_period_aggregates(icb_data_aggregated, 'recent', dataset_type)
 
 # Optional: drop unnecessary columns from base
 columns_to_drop = [col for col in ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage', 'List Size', 'COPD List Size', 'date', 'formatted_date'] if col in icb_data_aggregated.columns]
 base_means = icb_data_aggregated.drop_duplicates(subset='Practice').drop(columns=columns_to_drop)
 
-# STEP 4: Merge base info with new means
+# Merge base info with new means
 icb_means_merged = pd.merge(base_means, means, on='Practice')
 
-# STEP 5: Calculate rate
+# Calculate rate for the selected measure
 icb_means_merged[measure_type] = (
     (icb_means_merged[numerator_column] / icb_means_merged[denominator_column]) * 1000
 ).round(1)
 
 # Calculate PREVIOUS rates using 4-6m data (only for non-High Cost Drugs)
 if dataset_type != "High Cost Drugs":
-    previous_data = icb_data_aggregated[icb_data_aggregated['period_tag'] == 'previous']
+    previous_means = compute_period_aggregates(icb_data_aggregated, 'previous', dataset_type, group_cols=('Practice',))
 
-    # STEP 1: Sum numerators over previous 3 months
-    prev_sum_numerators = previous_data.groupby('Practice', as_index=False)[
-        ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
-    ].sum().round(1)
-
-    # STEP 2: Mean denominators over previous 3 months
-    prev_mean_denominators = previous_data.groupby('Practice', as_index=False)[
-        ['List Size', 'COPD List Size']
-    ].mean().round(1)
-
-    # STEP 3: Merge numerator and denominator
-    previous_means = pd.merge(prev_sum_numerators, prev_mean_denominators, on='Practice')
-
-    # STEP 4: Merge with base (which already contains recent values), creating new cols with _prev suffixed
+    # Merge with base (which already contains recent values), creating new cols with _prev suffixed
     icb_means_merged = pd.merge(
         icb_means_merged, previous_means, on='Practice', suffixes=('', '_prev')
     )
 
-    # STEP 5: Calculate previous-period rate using same formula
+    # Calculate previous-period rate using same formula
     icb_means_merged[f"{measure_type} (previous)"] = (
         icb_means_merged[f"{numerator_column}_prev"] / icb_means_merged[f"{denominator_column}_prev"] * 1000
     ).round(1)
 
-    # STEP 6: Calculate % CHANGE
+    # Calculate % CHANGE
     icb_means_merged["Δ from previous"] = (
         (icb_means_merged[measure_type] - icb_means_merged[f"{measure_type} (previous)"]) /
         icb_means_merged[f"{measure_type} (previous)"] * 100
@@ -528,33 +514,20 @@ if dataset_type != "High Cost Drugs":
 
 # Calculate LAST YEAR rates using matching period 12 months ago
 if dataset_type != "High Cost Drugs":
-    last_year_data = icb_data_aggregated[icb_data_aggregated['period_tag'] == 'last_year']
+    last_year_means = compute_period_aggregates(icb_data_aggregated, 'last_year', dataset_type, group_cols=('Practice',))
 
-    # STEP 1: Sum numerators over last-year 3 months
-    last_year_sum_numerators = last_year_data.groupby('Practice', as_index=False)[
-        ['Actual Cost', 'Items', 'ADQ Usage', 'DDD Usage']
-    ].sum().round(1)
-
-    # STEP 2: Mean denominators over last-year 3 months
-    last_year_mean_denominators = last_year_data.groupby('Practice', as_index=False)[
-        ['List Size', 'COPD List Size']
-    ].mean().round(1)
-
-    # STEP 3: Merge numerator and denominator
-    last_year_means = pd.merge(last_year_sum_numerators, last_year_mean_denominators, on='Practice')
-
-    # STEP 4: Merge into main df, add suffix
+    # Merge into main df, add suffix
     icb_means_merged = pd.merge(
         icb_means_merged, last_year_means, on='Practice', suffixes=('', '_lastyear')
     )
 
-    # STEP 5: Calculate last-year-period rate
+    # Calculate last-year-period rate
     icb_means_merged[f"{measure_type} (last year)"] = (
         icb_means_merged[f"{numerator_column}_lastyear"] /
         icb_means_merged[f"{denominator_column}_lastyear"] * 1000
     ).round(1)
 
-    # STEP 6: Calculate % CHANGE FROM LAST YEAR
+    # Calculate % CHANGE FROM LAST YEAR
     icb_means_merged["Δ from last year"] = (
         (icb_means_merged[measure_type] - icb_means_merged[f"{measure_type} (last year)"]) /
         icb_means_merged[f"{measure_type} (last year)"] * 100
@@ -565,10 +538,11 @@ if dataset_type != "High Cost Drugs":
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
 
-# Calculate ICB Average Values
-total_numerator = sum_numerators[numerator_column].sum()
-total_denominator = mean_denominators[denominator_column].sum()
-icb_average_value = (total_numerator / total_denominator) * 1000
+# Calculate ICB Average Values from recent period aggregates
+total_numerator = means[numerator_column].sum()
+total_denominator = means[denominator_column].sum()
+icb_average_value = round((total_numerator / total_denominator) * 1000, 1) if total_denominator else 0.0
+
 
 
 
