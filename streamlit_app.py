@@ -82,6 +82,7 @@ dataset_measures = {
     "PPIs": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Dicycloverine": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Specials": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "High Cost Drugs": ["Spend per 1000 Patients", "Items per 1000 Patients"]
 }
 
@@ -536,7 +537,12 @@ if dataset_type != "High Cost Drugs":
 
 # Round item count
 icb_means_merged['Items'] = icb_means_merged['Items'].round(0).astype(int) # Round item count
+
+# Convert Items to monthly average for display only
 icb_means_merged.rename(columns={'Items': 'Items (monthly average)'}, inplace=True) # Rename items as monthly average for clarity
+icb_means_merged['Items (monthly average)'] = (
+    icb_means_merged['Items (monthly average)'] / 3
+)
 
 # Calculate ICB Average Values from recent period aggregates
 total_numerator = means[numerator_column].sum()
