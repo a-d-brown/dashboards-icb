@@ -869,10 +869,129 @@ if dataset_type == "High Cost Drugs":
 
             st.dataframe(styled_practice_breakdown, use_container_width=True, hide_index=True)
 
+# === Specials: Top 100 High Cost Specials (latest 3m) ===
+if dataset_type == "Specials":
+    # Use the same "selected_practice / selected_sublocation" logic as High Cost Drugs
+    # Defensive column detection for presentation and cost/items
+    df = icb_data_preprocessed.copy()
 
-else:
+    # choose a presentation-ish column (common variants)
+    presentation_col = next(
+        (c for c in ["BNF Presentation plus Code", "Presentation", "BNF Presentation"] if c in df.columns),
+        None,
+    )
+    # choose cost/items columns (should exist)
+    if "Actual Cost" not in df.columns or "Items" not in df.columns or presentation_col is None:
+        st.info("Specials dataset missing expected columns (Presentation / Actual Cost / Items).")
+    else:
+        # Filter the dataset to the most recent 3-month window already tagged as 'recent'
+        recent_df = df[df["period_tag"] == "recent"].copy()
 
-    # Existing line chart section for other datasets
+        # If user selected a practice or sublocation, narrow the dataset for the drilldowns
+        if selected_practice:
+            practice_data = recent_df[recent_df["Practice"] == selected_practice].copy()
+            context_label = f"at {selected_practice}"
+        elif selected_sublocation and selected_sublocation != "Show all":
+            practice_data = recent_df[recent_df["sub_location"].str.strip().str.casefold() == selected_sublocation.strip().casefold()].copy()
+            context_label = f"in {selected_sublocation}"
+        else:
+            practice_data = recent_df.copy()
+            context_label = "across NENC"
+
+        st.header(f"Top 100 Specials (latest 3m) {context_label}")
+
+        view_mode = st.radio(
+            "Select view",
+            options=["View as table", "View as scatterplot"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        # Get top 100 presentations by spend
+        top_presentations = (
+            practice_data
+            .groupby(presentation_col, as_index=False)[["Items", "Actual Cost"]]
+            .sum()
+            .sort_values("Actual Cost", ascending=False)
+            .head(100)[presentation_col]
+            .sort_values()
+            .tolist()
+        )
+
+        if len(top_presentations) == 0:
+            st.info("No specials data available for the selected scope.")
+        else:
+            if view_mode == "View as scatterplot":
+                top100_summary = (
+                    practice_data[practice_data[presentation_col].isin(top_presentations)]
+                    .groupby(presentation_col, as_index=False)[["Items", "Actual Cost"]]
+                    .sum()
+                    .sort_values("Actual Cost", ascending=False)
+                )
+                # Re-use your existing scatter func - it expects Items & Actual Cost
+                scatter_fig = plot_high_cost_drugs_scatter(top100_summary)
+                if scatter_fig:
+                    st.plotly_chart(scatter_fig, use_container_width=True)
+                else:
+                    st.info("No data available for the selected context.")
+
+            elif view_mode == "View as table":
+                top_drugs_grouped = (
+                    practice_data[practice_data[presentation_col].isin(top_presentations)]
+                    .groupby(presentation_col, as_index=False)[["Actual Cost", "Items"]]
+                    .sum()
+                )
+
+                # Avoid divide-by-zero
+                top_drugs_grouped["Average Cost per Item"] = top_drugs_grouped.apply(
+                    lambda r: (r["Actual Cost"] / r["Items"]) if r["Items"] else 0,
+                    axis=1,
+                )
+
+                top_drugs_table = top_drugs_grouped.sort_values("Actual Cost", ascending=False)
+
+                styled_table = top_drugs_table.style \
+                    .format({
+                        "Actual Cost": "£{:,.0f}",
+                        "Items": "{:,.0f}",
+                        "Average Cost per Item": "£{:,.0f}"
+                    }) \
+                    .background_gradient(subset=["Average Cost per Item"], cmap="Reds")
+
+                st.dataframe(styled_table, use_container_width=True, hide_index=True)
+
+            # Practice-level breakdown if a presentation is selected
+            selected_presentation = st.selectbox(f"Select a special to view practice-level breakdown:", top_presentations)
+
+            if selected_presentation:
+                subset = recent_df[recent_df[presentation_col] == selected_presentation]
+                num_practices = subset["Practice"].nunique()
+                st.subheader(f"{num_practices} practices in NENC prescribe {selected_presentation}")
+
+                practice_breakdown = (
+                    subset.groupby("Practice", as_index=False)[["Actual Cost", "Items"]]
+                    .sum()
+                    .sort_values("Actual Cost", ascending=False)
+                )
+
+                practice_breakdown["Average Cost per Item"] = practice_breakdown.apply(
+                    lambda r: (r["Actual Cost"] / r["Items"]) if r["Items"] else 0,
+                    axis=1,
+                )
+
+                styled_practice_breakdown = practice_breakdown.style \
+                    .format({
+                        "Actual Cost": "£{:,.0f}",
+                        "Items": "{:,.0f}",
+                        "Average Cost per Item": "£{:,.0f}"
+                    })
+
+                st.dataframe(styled_practice_breakdown, use_container_width=True, hide_index=True)
+
+
+if dataset_type != "High Cost Drugs":
+
+    # Line chart section for non-high cost drug datasets
 
     st.header(f'Trend analysis: {dataset_type} - {measure_type}')
 
