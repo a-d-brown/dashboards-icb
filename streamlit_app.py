@@ -900,13 +900,6 @@ if dataset_type == "Specials":
 
         st.header(f"Top 100 Specials (latest 3m) {context_label}")
 
-        view_mode = st.radio(
-            "Select view",
-            options=["View as table", "View as scatterplot"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-
         # Get top 100 presentations by spend
         top_presentations = (
             practice_data
@@ -921,44 +914,30 @@ if dataset_type == "Specials":
         if len(top_presentations) == 0:
             st.info("No specials data available for the selected scope.")
         else:
-            if view_mode == "View as scatterplot":
-                top100_summary = (
-                    practice_data[practice_data[presentation_col].isin(top_presentations)]
-                    .groupby(presentation_col, as_index=False)[["Items", "Actual Cost"]]
-                    .sum()
-                    .sort_values("Actual Cost", ascending=False)
-                )
-                # Re-use your existing scatter func - it expects Items & Actual Cost
-                scatter_fig = plot_high_cost_drugs_scatter(top100_summary)
-                if scatter_fig:
-                    st.plotly_chart(scatter_fig, use_container_width=True)
-                else:
-                    st.info("No data available for the selected context.")
+            # Always render the table (scatter option removed)
+            top_drugs_grouped = (
+                practice_data[practice_data[presentation_col].isin(top_presentations)]
+                .groupby(presentation_col, as_index=False)[["Actual Cost", "Items"]]
+                .sum()
+            )
 
-            elif view_mode == "View as table":
-                top_drugs_grouped = (
-                    practice_data[practice_data[presentation_col].isin(top_presentations)]
-                    .groupby(presentation_col, as_index=False)[["Actual Cost", "Items"]]
-                    .sum()
-                )
+            # Avoid divide-by-zero
+            top_drugs_grouped["Average Cost per Item"] = top_drugs_grouped.apply(
+                lambda r: (r["Actual Cost"] / r["Items"]) if r["Items"] else 0,
+                axis=1,
+            )
 
-                # Avoid divide-by-zero
-                top_drugs_grouped["Average Cost per Item"] = top_drugs_grouped.apply(
-                    lambda r: (r["Actual Cost"] / r["Items"]) if r["Items"] else 0,
-                    axis=1,
-                )
+            top_drugs_table = top_drugs_grouped.sort_values("Actual Cost", ascending=False)
 
-                top_drugs_table = top_drugs_grouped.sort_values("Actual Cost", ascending=False)
+            styled_table = top_drugs_table.style \
+                .format({
+                    "Actual Cost": "£{:,.0f}",
+                    "Items": "{:,.0f}",
+                    "Average Cost per Item": "£{:,.0f}"
+                }) \
+                .background_gradient(subset=["Average Cost per Item"], cmap="Reds")
 
-                styled_table = top_drugs_table.style \
-                    .format({
-                        "Actual Cost": "£{:,.0f}",
-                        "Items": "{:,.0f}",
-                        "Average Cost per Item": "£{:,.0f}"
-                    }) \
-                    .background_gradient(subset=["Average Cost per Item"], cmap="Reds")
-
-                st.dataframe(styled_table, use_container_width=True, hide_index=True)
+            st.dataframe(styled_table, use_container_width=True, hide_index=True)
 
             # Practice-level breakdown if a presentation is selected
             selected_presentation = st.selectbox(f"Select a special to view practice-level breakdown:", top_presentations)
@@ -987,6 +966,7 @@ if dataset_type == "Specials":
                     })
 
                 st.dataframe(styled_practice_breakdown, use_container_width=True, hide_index=True)
+
 
 
 if dataset_type != "High Cost Drugs":
