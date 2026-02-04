@@ -78,6 +78,7 @@ dataset_measures = {
     "Lidocaine Patches": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
+    "Vitamin B12 IM": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Vitamin D": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "PPIs": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
