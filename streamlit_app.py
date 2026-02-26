@@ -79,6 +79,7 @@ dataset_measures = {
     "SABAs": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Closed Triple Inhalers": ["Spend per 1000 COPD Patients", "Items per 1000 COPD Patients"],
     "Vitamin B12 IM": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+    "Vitamin C": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "Vitamin D": ["Spend per 1000 Patients", "Items per 1000 Patients"],
     "PPIs": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
     "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
@@ -317,6 +318,40 @@ with col3_dataset:
 
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
+
+# COMMENTED OUT FOR NOW
+# # Load all drugs file
+# @st.cache_data
+# def load_all_drugs(path="All Drugs.csv"):
+#     """
+#     Load All Drugs CSV (cached). Returns None if file missing or load fails.
+#     """
+#     try:
+#         if not os.path.exists(path):
+#             return None
+#         return pd.read_csv(path)
+#     except Exception as e:
+#         # Return None so UI can show a friendly message rather than crash
+#         return None
+
+# all_drugs_df = load_all_drugs()
+
+# if all_drugs_df is None:
+#     st.warning("`All Drugs.csv` was not found or could not be read from the app folder.")
+# else:
+#     # ------------------ NEW: remove DUMMY rows ------------------
+#     if "ICB plus Code" in all_drugs_df.columns:
+#         all_drugs_df = all_drugs_df[
+#             ~all_drugs_df["ICB plus Code"]
+#             .astype(str)
+#             .str.contains("DUMMY", case=False, na=False)
+#         ]
+#     else:
+#         st.warning("Column 'ICB plus Code' not found in All Drugs.csv")
+
+#     st.header("All Drugs — preview (first 5 rows)")
+#     st.dataframe(all_drugs_df.head(), use_container_width=True)
+
 
 # Decide which numerator and denominator column to use
 numerator_column = measure_metadata[measure_type]["numerator_column"]
