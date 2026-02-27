@@ -319,10 +319,9 @@ with col3_dataset:
 ## ── Data Loading ───────────────────────────────
 icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
-# COMMENTED OUT FOR NOW
 # # Load all drugs file
 # @st.cache_data
-# def load_all_drugs(path="All Drugs.csv"):
+# def load_all_drugs(path="All Drugs National.csv"):
 #     """
 #     Load All Drugs CSV (cached). Returns None if file missing or load fails.
 #     """
@@ -336,21 +335,9 @@ icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
 # all_drugs_df = load_all_drugs()
 
-# if all_drugs_df is None:
-#     st.warning("`All Drugs.csv` was not found or could not be read from the app folder.")
-# else:
-#     # ------------------ NEW: remove DUMMY rows ------------------
-#     if "ICB plus Code" in all_drugs_df.columns:
-#         all_drugs_df = all_drugs_df[
-#             ~all_drugs_df["ICB plus Code"]
-#             .astype(str)
-#             .str.contains("DUMMY", case=False, na=False)
-#         ]
-#     else:
-#         st.warning("Column 'ICB plus Code' not found in All Drugs.csv")
 
-#     st.header("All Drugs — preview (first 5 rows)")
-#     st.dataframe(all_drugs_df.head(), use_container_width=True)
+# st.header("All Drugs — preview (first 5 rows)")
+# st.dataframe(all_drugs_df.head(), use_container_width=True)
 
 
 # Decide which numerator and denominator column to use
