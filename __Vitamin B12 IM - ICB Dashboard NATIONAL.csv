@@ -1,8 +1,4 @@
 ﻿Year Month,Country,BNF Chemical Substance plus Code,BNF Presentation plus Code,Items,Actual Cost,ADQ Usage,List Size
-202312,ENGLAND,Cyanocobalamin (0901020D0),Cyanocobalamin 1mg/1ml solution for injection ampoules (0901020D0AAADAD),660,6498.92952054647,,63205534
-202312,ENGLAND,Hydroxocobalamin (0901020N0),Hydroxocobalamin 1mg/1ml solution for injection ampoules (0901020N0AAABAB),256252,781827.434455408,,63205534
-202312,ENGLAND,Hydroxocobalamin (0901020N0),Hydroxocobalamin 10mg/2ml solution for injection ampoules (0901020N0AAAMAM),1,55.5988388681685,,63205534
-202312,ENGLAND,Hydroxocobalamin (0901020N0),Neo-Cytamen 1000micrograms/1ml inj ampoules (0901020N0BBAAAB),4,11.8652837255092,,63205534
 202401,ENGLAND,Cyanocobalamin (0901020D0),Cyanocobalamin 1mg/1ml solution for injection ampoules (0901020D0AAADAD),654,5973.7133897088,,63271011
 202401,ENGLAND,Hydroxocobalamin (0901020N0),Hydroxocobalamin 1mg/1ml solution for injection ampoules (0901020N0AAABAB),272885,793518.502502771,,63271011
 202401,ENGLAND,Hydroxocobalamin (0901020N0),Hydroxocobalamin 10mg/2ml solution for injection ampoules (0901020N0AAAMAM),2,364.496738404918,,63271011
@@ -93,3 +89,6 @@
 202511,ENGLAND,Cyanocobalamin (0901020D0),Cytamen 1000micrograms/1ml solution for injection ampoules (0901020D0BBABAD),1,3.07494311805813,,63996561
 202511,ENGLAND,Hydroxocobalamin (0901020N0),Hydroxocobalamin 1mg/1ml solution for injection ampoules (0901020N0AAABAB),257137,685062.891122677,,63996561
 202511,ENGLAND,Hydroxocobalamin (0901020N0),Neo-Cytamen 1000micrograms/1ml inj ampoules (0901020N0BBAAAB),86,191.516140306864,,63996561
+202512,ENGLAND,Cyanocobalamin (0901020D0),Cyanocobalamin 1mg/1ml solution for injection ampoules (0901020D0AAADAD),12,119.344094676412,,63957289
+202512,ENGLAND,Hydroxocobalamin (0901020N0),Hydroxocobalamin 1mg/1ml solution for injection ampoules (0901020N0AAABAB),281927,737317.020999086,,63957289
+202512,ENGLAND,Hydroxocobalamin (0901020N0),Neo-Cytamen 1000micrograms/1ml inj ampoules (0901020N0BBAAAB),23,52.0969350557807,,63957289
