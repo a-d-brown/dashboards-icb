@@ -261,7 +261,7 @@ if not st.session_state.explore_mode:
     # ── 3-Column Header Layout ─────────────────────────────
     col1_title, col2_subloc, col_divider, col3_dataset = st.columns([2.5, 1.4, 0.05, 1.4])
 
-    # ── COLUMN 1: Title + Badge ─────────────────────────────
+    # ── COLUMN 1: Title + Badge + Exploration Button ─────────────────────────────
     with col1_title:
         st.markdown("""
             <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 1rem;">
@@ -273,28 +273,18 @@ if not st.session_state.explore_mode:
                 </div>
             </div>
         """, unsafe_allow_html=True)
-    
-    # Exploration mode toggle (placed after the page title block)
-    if "explore_mode" not in st.session_state:
-        st.session_state.explore_mode = False
+        
+        # Exploration mode toggle button in the same column as title
+        if "explore_mode" not in st.session_state:
+            st.session_state.explore_mode = False
 
-    # Exploration mode toggle (placed after the page title block)
-    def enter_explore():
-        st.session_state.explore_mode = True
+        def enter_explore():
+            st.session_state.explore_mode = True
 
-    def exit_explore():
-        st.session_state.explore_mode = False
+        def exit_explore():
+            st.session_state.explore_mode = False
 
-    with st.container():
-        if not st.session_state.explore_mode:
-            # use on_click so state flips immediately and the rerun shows explore UI
-            st.button("Go to Exploration mode", on_click=enter_explore, key="enter_explore")
-        else:
-            cols = st.columns([1, 5])
-            with cols[0]:
-                st.button("Exit Exploration mode", on_click=exit_explore, key="exit_explore")
-            with cols[1]:
-                st.markdown("### <span style='color:#d32f2f'>Exploration mode — all other page content hidden</span>", unsafe_allow_html=True)
+        st.button("Go to Exploration mode", on_click=enter_explore, key="enter_explore")
 
     # ── COLUMN 2: Sub-location + Practice ───────────────────
     with col2_subloc:   
@@ -1115,6 +1105,11 @@ if not st.session_state.explore_mode:
 
 else:
     # ---------- Exploration mode ----------
+    
+    # Add button to return to main page
+    if st.button("← Go to prebuilt measures"):
+        st.session_state.explore_mode = False
+        st.rerun()
 
     # --- Load data ---
     all_drugs_df = load_all_drugs()
