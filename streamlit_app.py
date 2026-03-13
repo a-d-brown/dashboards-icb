@@ -524,40 +524,7 @@ if not st.session_state.explore_mode:
     # Aggregate latest 3 months
     means = compute_period_aggregates(icb_data_aggregated, 'recent', dataset_type)
 
-    # Build a dynamic label for the "current/latest 3m" option ---
-    def make_recent_3m_label(date_period_series):
-        """
-        Accepts a pandas Series of Timestamp/period-start datetimes (date_period column).
-        Returns a human-friendly label like "Apr–Jun 2025" or "Dec 2024–Feb 2025".
-        """
-        # get unique periods sorted descending (latest first)
-        periods = pd.Series(date_period_series.drop_duplicates()).sort_values(ascending=False).tolist()
-        if len(periods) == 0:
-            return "latest 3m"  # fallback
-        
-        # take up to 3 latest periods
-        recent = periods[:3]
-        # compute earliest and latest of the selection
-        latest_ts = recent[0]
-        earliest_ts = recent[-1]
-        
-        # if only one month available, show single month/ year
-        if len(recent) == 1:
-            return earliest_ts.strftime("%b %Y")
-        # if two months available, show range e.g. "May–Jun 2025" or "Dec 2024–Jan 2025"
-        if len(recent) == 2:
-            if earliest_ts.year == latest_ts.year:
-                return f"{earliest_ts.strftime('%b')}–{latest_ts.strftime('%b %Y')}"
-            else:
-                return f"{earliest_ts.strftime('%b %Y')}–{latest_ts.strftime('%b %Y')}"
-        # three months available (usual case)
-        if earliest_ts.year == latest_ts.year:
-            # same year -> show "Apr–Jun 2025"
-            return f"{earliest_ts.strftime('%b')}–{latest_ts.strftime('%b %Y')}"
-        else:
-            # span years -> show full years on both ends "Dec 2024–Feb 2025"
-            return f"{earliest_ts.strftime('%b %Y')}–{latest_ts.strftime('%b %Y')}"
-
+    # Build dynamic date labels for all datasets
     def make_3m_window_label(date_period_series, start_index):
         """
         Builds a 3-month window label from sorted latest periods.
@@ -576,8 +543,9 @@ if not st.session_state.explore_mode:
         if len(window) == 0:
             return ""
 
-        latest_ts = window[0]
-        earliest_ts = window[-1]
+        # Convert to datetime to handle both string and datetime inputs
+        latest_ts = pd.to_datetime(window[0])
+        earliest_ts = pd.to_datetime(window[-1])
 
         if len(window) == 1:
             return earliest_ts.strftime("%b %Y")
@@ -586,16 +554,14 @@ if not st.session_state.explore_mode:
             return f"{earliest_ts.strftime('%b')}–{latest_ts.strftime('%b %Y')}"
         else:
             return f"{earliest_ts.strftime('%b %Y')}–{latest_ts.strftime('%b %Y')}"
-        
+    
     date_series = icb_data_preprocessed["date_period"]
-
     current_3m_label = make_3m_window_label(date_series, 0)
-    previous_3m_label = make_3m_window_label(date_series, 3)
-    last_year_3m_label = make_3m_window_label(date_series, 12)
-
-    current_label = f"Current Rate ({current_3m_label})"
-    previous_change_label = f"Recent change ({current_3m_label} vs {previous_3m_label})"
-    last_year_change_label = f"Annual change ({current_3m_label} vs {last_year_3m_label})"
+    
+    # Only create previous and last year labels for non-High Cost Drug datasets
+    if dataset_type != "High Cost Drugs":
+        previous_3m_label = make_3m_window_label(date_series, 3)
+        last_year_3m_label = make_3m_window_label(date_series, 12)
 
 
     # Optional: drop unnecessary columns from base
@@ -682,8 +648,6 @@ if not st.session_state.explore_mode:
 
     # ── Bar Chart Section ─────────────────────────────
 
-    st.header(f'Practice comparisons: {dataset_type} - {measure_type}')
-
     # Convert selection to a list for filtering
     if selected_sublocation == "Show all":
         selected_sublocations = list(sub_location_colors.keys())
@@ -694,15 +658,30 @@ if not st.session_state.explore_mode:
     # ── Toggle for bar chart y-axis mode ─────────────
     use_delta_chart = False
     use_year_change = False
+    
     if dataset_type != "High Cost Drugs":
+        # Radio buttons WITHOUT date labels
         mode_option = st.radio(
             "",
-            [current_label, previous_change_label, last_year_change_label],
+            ["Current Rate", "Recent change", "Annual change"],
             index=0,
             horizontal=True
         )
-        use_delta_chart = mode_option == previous_change_label
-        use_year_change = mode_option == last_year_change_label
+        use_delta_chart = mode_option == "Recent change"
+        use_year_change = mode_option == "Annual change"
+        
+        # Build dynamic title based on selected mode
+        if use_delta_chart:
+            header_title = f'Practice comparisons: {dataset_type} - {measure_type} ({current_3m_label} vs {previous_3m_label})'
+        elif use_year_change:
+            header_title = f'Practice comparisons: {dataset_type} - {measure_type} ({current_3m_label} vs {last_year_3m_label})'
+        else:
+            header_title = f'Practice comparisons: {dataset_type} - {measure_type} ({current_3m_label})'
+    else:
+        # High Cost Drugs always shows current 3m
+        header_title = f'Practice comparisons: {dataset_type} - {measure_type} ({current_3m_label})'
+    
+    st.header(header_title)
 
     # Filter by selected sublocations for plotting
     filtered_data = icb_means_merged[
