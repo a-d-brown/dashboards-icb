@@ -284,7 +284,7 @@ if not st.session_state.explore_mode:
         def exit_explore():
             st.session_state.explore_mode = False
 
-        st.button("Go to Exploration mode", on_click=enter_explore, key="enter_explore")
+        st.button("Go to BNF explorer", on_click=enter_explore, key="enter_explore")
 
     # ── COLUMN 2: Sub-location + Practice ───────────────────
     with col2_subloc:   
@@ -1339,7 +1339,7 @@ else:
     ])
 
     # --- Render ---
-    st.header("Exploration mode — dataset preview")
+    st.header("BNF explorer — dataset preview")
     st.dataframe(
         table_df,
         use_container_width=True,
