@@ -1159,8 +1159,9 @@ else:
 
         bnf_search = st.text_input(
             f"Search within {selected_level_label}:",
-            placeholder=f"Type to filter {selected_level_label.lower()}...",
-            key="bnf_search_box"
+            placeholder=f"Type to find a specific {selected_level_label.lower()}...",
+            key="bnf_search_box",
+            label_visibility="collapsed"
         )
 
     # ── Helper: aggregate raw data to pivot with from/to columns ──────────────
