@@ -1137,10 +1137,17 @@ else:
     month_to_label   = pd.to_datetime(month_to,   format="%Y%m").strftime("%b %Y")
 
     # --- BNF level and ICB selectors ---
+    BNF_LEVEL_ORDER = [
+        "BNF Chapter",
+        "BNF Section",
+        "BNF Sub Paragraph",
+        "BNF Chemical Substance",
+    ]
+
     BNF_LEVELS = {
-        "BNF Chapter":            "BNF Chapter plus Code",
-        "BNF Section":            "BNF Section plus Code",
-        "BNF Sub Paragraph":      "BNF Sub Paragraph plus Code",
+        "BNF Chapter": "BNF Chapter plus Code",
+        "BNF Section": "BNF Section plus Code",
+        "BNF Sub Paragraph": "BNF Sub Paragraph plus Code",
         "BNF Chemical Substance": "BNF Chemical Substance plus Code",
     }
 
@@ -1149,20 +1156,67 @@ else:
     col_icb, col_bnf = st.columns([2, 1])
 
     with col_icb:
-        icb_choices   = sorted(all_drugs_df["ICB plus Code"].dropna().unique())
+        icb_choices = sorted(all_drugs_df["ICB plus Code"].dropna().unique())
         default_index = icb_choices.index(DEFAULT_ICB) if DEFAULT_ICB in icb_choices else 0
-        selected_icb  = st.selectbox("Select ICB:", icb_choices, index=default_index)
+        selected_icb = st.selectbox("Select ICB:", icb_choices, index=default_index)
 
     with col_bnf:
-        selected_level_label = st.selectbox("Group by BNF level:", list(BNF_LEVELS.keys()), index=3)
-        bnf_col = BNF_LEVELS[selected_level_label]
+        search_level_label = st.selectbox(
+            "Filter by BNF category:",
+            BNF_LEVEL_ORDER,
+            index=0,
+        )
+
+        search_col = BNF_LEVELS[search_level_label]
 
         bnf_search = st.text_input(
-            f"Search within {selected_level_label}:",
-            placeholder=f"Type to find a specific {selected_level_label.lower()}...",
+            f"Search within {search_level_label}:",
+            placeholder=f"Type to find a specific {search_level_label.lower()}...",
             key="bnf_search_box",
             label_visibility="collapsed"
         )
+
+        # Build suggestion list from the selected search column
+        all_terms = (
+            all_drugs_df[search_col]
+            .dropna()
+            .astype(str)
+            .drop_duplicates()
+            .sort_values()
+            .tolist()
+        )
+
+        selected_term = None
+        breakdown_level_label = search_level_label
+
+        if bnf_search.strip():
+            term = bnf_search.strip().casefold()
+            suggestions = [x for x in all_terms if term in x.casefold()][:10]
+
+            if suggestions:
+                st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+
+                category_col, granularity_col = st.columns(2, gap="small")
+                allowed_breakdown_levels = BNF_LEVEL_ORDER[BNF_LEVEL_ORDER.index(search_level_label):]
+
+                with category_col:
+                    chosen_suggestion = st.selectbox(
+                        "Select category to breakdown",
+                        ["-- No breakdown --"] + suggestions,
+                        key=f"bnf_suggestion_box_{search_level_label}",
+                    )
+
+                    if chosen_suggestion != "-- No breakdown --":
+                        selected_term = chosen_suggestion
+
+                with granularity_col:
+                    breakdown_level_label = st.selectbox(
+                        "Select breakdown granularity",
+                        allowed_breakdown_levels,
+                        index=0,
+                    )
+
+    breakdown_col = BNF_LEVELS[breakdown_level_label]
 
     # ── Helper: aggregate raw data to pivot with from/to columns ──────────────
     def build_pivot(df, bnf_col, month_from, month_to):
@@ -1259,32 +1313,51 @@ else:
         return num
 
     # --- Build ICB pivot ---
-    icb_df  = all_drugs_df[all_drugs_df["ICB plus Code"] == selected_icb].copy()
-    pivot   = build_pivot(icb_df, bnf_col, month_from, month_to)
+    icb_df = all_drugs_df[all_drugs_df["ICB plus Code"] == selected_icb].copy()
 
-    # --- Free-text search filter ---
-    if bnf_search.strip():
-        search_term = bnf_search.strip().casefold()
-        pivot = pivot[
-            pivot[bnf_col]
+    search_text = bnf_search.strip()
+
+    # Default behaviour: stay at the selected search level
+    display_bnf_col = search_col
+    display_bnf_label = search_level_label
+
+    # If a suggestion was selected, drill down using the chosen breakdown level
+    if selected_term:
+        icb_df = icb_df[icb_df[search_col].astype(str) == selected_term].copy()
+        display_bnf_col = breakdown_col
+        display_bnf_label = breakdown_level_label
+
+    # If the user only typed text, filter at the selected search level and keep that level in the table
+    elif search_text:
+        icb_df = icb_df[
+            icb_df[search_col]
             .astype(str)
-            .str.casefold()
-            .str.contains(search_term, na=False)
+            .str.contains(search_text, case=False, na=False)
         ].copy()
 
-    # --- Build England pivot (rows labelled 'England' in ICB plus Code) ---
-    eng_df  = all_drugs_df[all_drugs_df["ICB plus Code"] == "England"].copy()
-    eng_pivot = build_pivot(eng_df, bnf_col, month_from, month_to)
+    if display_bnf_col not in icb_df.columns:
+        st.error(f"Missing {display_bnf_col} column.")
+        st.stop()
 
-    # Rename England rate columns to avoid clash on merge
-    eng_pivot = eng_pivot[[bnf_col, "spend_per_patient_to", "items_per_patient_to", "spend_per_item_to"]].rename(columns={
+    pivot = build_pivot(icb_df, display_bnf_col, month_from, month_to)
+
+    # --- Build England pivot using the same display column ---
+    eng_df = all_drugs_df[all_drugs_df["ICB plus Code"] == "England"].copy()
+    eng_pivot = build_pivot(eng_df, display_bnf_col, month_from, month_to)
+
+    eng_pivot = eng_pivot[[
+        display_bnf_col, "spend_per_patient_to", "items_per_patient_to", "spend_per_item_to"
+    ]].rename(columns={
         "spend_per_patient_to": "eng_spend_per_patient_to",
         "items_per_patient_to": "eng_items_per_patient_to",
-        "spend_per_item_to":    "eng_spend_per_item_to",
+        "spend_per_item_to": "eng_spend_per_item_to",
     })
 
-    # Merge England rates into ICB pivot
-    pivot = pivot.merge(eng_pivot, on=bnf_col, how="left")
+    pivot = pivot.merge(eng_pivot, on=display_bnf_col, how="left")
+
+    # Rename the display column after the merge so the table header stays nice
+    pivot = pivot.rename(columns={display_bnf_col: display_bnf_label})
+    display_bnf_col = display_bnf_label
 
     # Fill missing England rates with 0 (drug not prescribed nationally — edge case)
     for col in ["eng_spend_per_patient_to", "eng_items_per_patient_to", "eng_spend_per_item_to"]:
@@ -1302,7 +1375,7 @@ else:
 
     # --- Build display table ---
     table_df = pivot[[
-        bnf_col,
+        display_bnf_col,
         f"Actual Cost_{month_to}",
         f"Items_{month_to}",
         "spend_per_item_to",
@@ -1314,8 +1387,8 @@ else:
         "Spend per Item - % vs National",
     ]].copy().rename(columns={
         f"Actual Cost_{month_to}": "Actual Cost",
-        f"Items_{month_to}":       "Items",
-        "spend_per_item_to":       "Cost per Item",
+        f"Items_{month_to}": "Items",
+        "spend_per_item_to": "Cost per Item",
     })
 
     table_df["Actual Cost"]                        = table_df["Actual Cost"].round(0)
@@ -1331,6 +1404,19 @@ else:
     # Filter out zero-item and low-cost rows
     table_df = table_df[(table_df["Items"] > 0) & (table_df["Actual Cost"] >= 30)].reset_index(drop=True)
 
+    table_df.columns = pd.MultiIndex.from_tuples([
+        ("", display_bnf_label),
+        (f"Current values ({month_to_label})", "Actual Cost"),
+        (f"Current values ({month_to_label})", "Items"),
+        (f"Current values ({month_to_label})", "Cost per Item"),
+        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Patient"),
+        (f"Change over time ({month_from_label} → {month_to_label})", "Items per Patient"),
+        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Item"),
+        (f"Difference relative to national ({month_to_label})", "Spend per Patient"),
+        (f"Difference relative to national ({month_to_label})", "Items per Patient"),
+        (f"Difference relative to national ({month_to_label})", "Spend per Item"),
+    ])
+
     # column_config keys must match the SECOND level of the MultiIndex
     column_config = {
         "Actual Cost":      st.column_config.NumberColumn(format="£%.0f"),
@@ -1343,7 +1429,7 @@ else:
 
     # Assign MultiIndex for grouped headers
     table_df.columns = pd.MultiIndex.from_tuples([
-        ("",                                                            selected_level_label),
+        ("",                                                            display_bnf_label),
         (f"Current values ({month_to_label})",                          "Actual Cost"),
         (f"Current values ({month_to_label})",                          "Items"),
         (f"Current values ({month_to_label})",                          "Cost per Item"),
@@ -1389,11 +1475,23 @@ else:
         .applymap(colour_pct, subset=percent_cols)
     )
 
+    # Dynamic height based on the final filtered table
+    row_height = 48
+    header_height = 60
+    min_height = 0
+    max_height = 900
+
+    table_height = max(
+        min_height,
+        min(max_height, header_height + (len(table_df) * row_height))
+    )
+
     st.dataframe(
         styled_table,
         use_container_width=True,
         hide_index=True,
         column_config=column_config,
+        height=table_height,
     )
 
     csv = table_df.to_csv(index=False).encode("utf-8")
