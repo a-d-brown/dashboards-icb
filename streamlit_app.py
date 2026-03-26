@@ -1157,6 +1157,12 @@ else:
         selected_level_label = st.selectbox("Group by BNF level:", list(BNF_LEVELS.keys()), index=3)
         bnf_col = BNF_LEVELS[selected_level_label]
 
+        bnf_search = st.text_input(
+            f"Search within {selected_level_label}:",
+            placeholder=f"Type to filter {selected_level_label.lower()}...",
+            key="bnf_search_box"
+        )
+
     # ── Helper: aggregate raw data to pivot with from/to columns ──────────────
     def build_pivot(df, bnf_col, month_from, month_to):
         """
@@ -1255,6 +1261,16 @@ else:
     icb_df  = all_drugs_df[all_drugs_df["ICB plus Code"] == selected_icb].copy()
     pivot   = build_pivot(icb_df, bnf_col, month_from, month_to)
 
+    # --- Free-text search filter ---
+    if bnf_search.strip():
+        search_term = bnf_search.strip().casefold()
+        pivot = pivot[
+            pivot[bnf_col]
+            .astype(str)
+            .str.casefold()
+            .str.contains(search_term, na=False)
+        ].copy()
+
     # --- Build England pivot (rows labelled 'England' in ICB plus Code) ---
     eng_df  = all_drugs_df[all_drugs_df["ICB plus Code"] == "England"].copy()
     eng_pivot = build_pivot(eng_df, bnf_col, month_from, month_to)
@@ -1340,8 +1356,40 @@ else:
 
     # --- Render ---
     st.header("BNF explorer — dataset preview")
+
+    percent_cols = [
+        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Patient"),
+        (f"Change over time ({month_from_label} → {month_to_label})", "Items per Patient"),
+        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Item"),
+        (f"Difference relative to national ({month_to_label})", "Spend per Patient"),
+        (f"Difference relative to national ({month_to_label})", "Items per Patient"),
+        (f"Difference relative to national ({month_to_label})", "Spend per Item"),
+    ]
+
+    def colour_pct(val):
+        if pd.isna(val) or val == 999999.0:
+            return ""
+        try:
+            val = float(val)
+        except Exception:
+            return ""
+        
+        # Red = positive, green = negative
+        if val > 0:
+            return "background-color: #f4cccc;"
+        elif val < 0:
+            return "background-color: #d9ead3;"
+        else:
+            return ""  # neutral zero
+            
+
+    styled_table = (
+        table_df.style
+        .applymap(colour_pct, subset=percent_cols)
+    )
+
     st.dataframe(
-        table_df,
+        styled_table,
         use_container_width=True,
         hide_index=True,
         column_config=column_config,
