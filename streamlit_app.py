@@ -1384,11 +1384,14 @@ else:
     ).round(0)
 
     # (b) Financial impact of the difference from national spend per patient:
-    #     = (% diff vs national / 100) * actual cost in current month
+    #     = Actual Cost (ICB) − (National Spend per Patient × ICB List Size)
+    #     i.e. what the ICB actually spent minus what it would have spent at the national rate.
+    #     Positive → ICB overspends vs national; negative → ICB underspends.
+    #     Where national rate is 0 (drug not prescribed nationally), result is NaN.
     pivot["Financial Impact of Difference from National Spend per Patient"] = np.where(
-        pivot["Spend per Patient - % vs National"].isna(),
+        pivot["eng_spend_per_patient_to"] == 0,
         np.nan,
-        (pivot["Spend per Patient - % vs National"] / 100.0) * pivot[f"Actual Cost_{month_to}"]
+        pivot[f"Actual Cost_{month_to}"] - (pivot["eng_spend_per_patient_to"] * pivot[f"List Size_{month_to}"])
     ).round(0)
 
     # --- Build display table ---
@@ -1458,7 +1461,7 @@ else:
     }
 
     # --- Render ---
-    st.header("BNF explorer — dataset preview")
+    st.header("BNF explorer")
 
     # All sign-coloured columns — % and £ financial impact columns use the same red/green logic
     signed_cols = [
