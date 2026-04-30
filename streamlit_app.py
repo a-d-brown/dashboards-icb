@@ -1373,6 +1373,24 @@ else:
     pivot["Items per Patient - % vs National"]  = pct_diff_vs_national(pivot["items_per_patient_to"].to_numpy(), pivot["eng_items_per_patient_to"].to_numpy())
     pivot["Spend per Item - % vs National"]     = pct_diff_vs_national(pivot["spend_per_item_to"].to_numpy(),    pivot["eng_spend_per_item_to"].to_numpy())
 
+    # --- Compute financial impact columns ---
+    # (a) Financial impact of the change in spend per patient over time:
+    #     = (% change in spend per patient / 100) * actual cost in current month
+    #     Treat new-entry sentinel (999999.0) as NaN — no meaningful baseline to compare against.
+    pivot["Financial Impact of Change in Spend per Patient"] = np.where(
+        (pivot["Spend per Patient - % Change"] == 999999.0) | pivot["Spend per Patient - % Change"].isna(),
+        np.nan,
+        (pivot["Spend per Patient - % Change"] / 100.0) * pivot[f"Actual Cost_{month_to}"]
+    ).round(0)
+
+    # (b) Financial impact of the difference from national spend per patient:
+    #     = (% diff vs national / 100) * actual cost in current month
+    pivot["Financial Impact of Difference from National Spend per Patient"] = np.where(
+        pivot["Spend per Patient - % vs National"].isna(),
+        np.nan,
+        (pivot["Spend per Patient - % vs National"] / 100.0) * pivot[f"Actual Cost_{month_to}"]
+    ).round(0)
+
     # --- Build display table ---
     table_df = pivot[[
         display_bnf_col,
@@ -1380,52 +1398,37 @@ else:
         f"Items_{month_to}",
         "spend_per_item_to",
         "Spend per Patient - % Change",
+        "Financial Impact of Change in Spend per Patient",
         "Items per Patient - % Change",
         "Spend per Item - % Change",
         "Spend per Patient - % vs National",
+        "Financial Impact of Difference from National Spend per Patient",
         "Items per Patient - % vs National",
         "Spend per Item - % vs National",
     ]].copy().rename(columns={
         f"Actual Cost_{month_to}": "Actual Cost",
         f"Items_{month_to}": "Items",
         "spend_per_item_to": "Cost per Item",
+        "Spend per Patient - % Change": "Spend per Patient - % Change",
+        "Financial Impact of Change in Spend per Patient": "Financial Impact for 1 month - Change",
+        "Spend per Patient - % vs National": "Spend per Patient - % vs National",
+        "Financial Impact of Difference from National Spend per Patient": "Financial Impact for 1 month - National",
     })
 
-    table_df["Actual Cost"]                        = table_df["Actual Cost"].round(0)
-    table_df["Items"]                              = table_df["Items"].round(0).astype("Int64")
-    table_df["Cost per Item"]                      = table_df["Cost per Item"].round(1)
-    table_df["Spend per Patient - % Change"]       = table_df["Spend per Patient - % Change"].round(1)
-    table_df["Items per Patient - % Change"]       = table_df["Items per Patient - % Change"].round(1)
-    table_df["Spend per Item - % Change"]          = table_df["Spend per Item - % Change"].round(1)
-    table_df["Spend per Patient - % vs National"]  = table_df["Spend per Patient - % vs National"].round(1)
-    table_df["Items per Patient - % vs National"]  = table_df["Items per Patient - % vs National"].round(1)
-    table_df["Spend per Item - % vs National"]     = table_df["Spend per Item - % vs National"].round(1)
+    table_df["Actual Cost"]                              = table_df["Actual Cost"].round(0)
+    table_df["Items"]                                    = table_df["Items"].round(0).astype("Int64")
+    table_df["Cost per Item"]                            = table_df["Cost per Item"].round(1)
+    table_df["Spend per Patient - % Change"]             = table_df["Spend per Patient - % Change"].round(1)
+    table_df["Financial Impact for 1 month - Change"]   = table_df["Financial Impact for 1 month - Change"].round(0)
+    table_df["Items per Patient - % Change"]             = table_df["Items per Patient - % Change"].round(1)
+    table_df["Spend per Item - % Change"]                = table_df["Spend per Item - % Change"].round(1)
+    table_df["Spend per Patient - % vs National"]        = table_df["Spend per Patient - % vs National"].round(1)
+    table_df["Financial Impact for 1 month - National"]  = table_df["Financial Impact for 1 month - National"].round(0)
+    table_df["Items per Patient - % vs National"]        = table_df["Items per Patient - % vs National"].round(1)
+    table_df["Spend per Item - % vs National"]           = table_df["Spend per Item - % vs National"].round(1)
 
     # Filter out zero-item and low-cost rows
     table_df = table_df[(table_df["Items"] > 0) & (table_df["Actual Cost"] >= 30)].reset_index(drop=True)
-
-    table_df.columns = pd.MultiIndex.from_tuples([
-        ("", display_bnf_label),
-        (f"Current values ({month_to_label})", "Actual Cost"),
-        (f"Current values ({month_to_label})", "Items"),
-        (f"Current values ({month_to_label})", "Cost per Item"),
-        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Patient"),
-        (f"Change over time ({month_from_label} → {month_to_label})", "Items per Patient"),
-        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Item"),
-        (f"Difference relative to national ({month_to_label})", "Spend per Patient"),
-        (f"Difference relative to national ({month_to_label})", "Items per Patient"),
-        (f"Difference relative to national ({month_to_label})", "Spend per Item"),
-    ])
-
-    # column_config keys must match the SECOND level of the MultiIndex
-    column_config = {
-        "Actual Cost":      st.column_config.NumberColumn(format="£%.0f"),
-        "Cost per Item":    st.column_config.NumberColumn(format="£%.2f"),
-        "Items":            st.column_config.NumberColumn(format="%d"),
-        "Spend per Patient":st.column_config.NumberColumn(format="%.1f%%"),
-        "Items per Patient":st.column_config.NumberColumn(format="%.1f%%"),
-        "Spend per Item":   st.column_config.NumberColumn(format="%.1f%%"),
-    }
 
     # Assign MultiIndex for grouped headers
     table_df.columns = pd.MultiIndex.from_tuples([
@@ -1434,45 +1437,58 @@ else:
         (f"Current values ({month_to_label})",                          "Items"),
         (f"Current values ({month_to_label})",                          "Cost per Item"),
         (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Patient"),
+        (f"Change over time ({month_from_label} → {month_to_label})", "Financial Impact for 1 month"),
         (f"Change over time ({month_from_label} → {month_to_label})", "Items per Patient"),
         (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Item"),
         (f"Difference relative to national ({month_to_label})",       "Spend per Patient"),
+        (f"Difference relative to national ({month_to_label})",       "Financial Impact for 1 month"),
         (f"Difference relative to national ({month_to_label})",       "Items per Patient"),
         (f"Difference relative to national ({month_to_label})",       "Spend per Item"),
     ])
 
+    # column_config keys must match the SECOND level of the MultiIndex
+    column_config = {
+        "Actual Cost":                  st.column_config.NumberColumn(format="£%.0f"),
+        "Cost per Item":                st.column_config.NumberColumn(format="£%.2f"),
+        "Items":                        st.column_config.NumberColumn(format="%d"),
+        "Financial Impact for 1 month": st.column_config.NumberColumn(format="£%.0f"),
+        "Spend per Patient":            st.column_config.NumberColumn(format="%.1f%%"),
+        "Items per Patient":            st.column_config.NumberColumn(format="%.1f%%"),
+        "Spend per Item":               st.column_config.NumberColumn(format="%.1f%%"),
+    }
+
     # --- Render ---
     st.header("BNF explorer — dataset preview")
 
-    percent_cols = [
-        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Patient"),
-        (f"Change over time ({month_from_label} → {month_to_label})", "Items per Patient"),
-        (f"Change over time ({month_from_label} → {month_to_label})", "Spend per Item"),
-        (f"Difference relative to national ({month_to_label})", "Spend per Patient"),
-        (f"Difference relative to national ({month_to_label})", "Items per Patient"),
-        (f"Difference relative to national ({month_to_label})", "Spend per Item"),
+    # All sign-coloured columns — % and £ financial impact columns use the same red/green logic
+    signed_cols = [
+        (f"Change over time ({month_from_label} \u2192 {month_to_label})", "Spend per Patient"),
+        (f"Change over time ({month_from_label} \u2192 {month_to_label})", "Financial Impact for 1 month"),
+        (f"Change over time ({month_from_label} \u2192 {month_to_label})", "Items per Patient"),
+        (f"Change over time ({month_from_label} \u2192 {month_to_label})", "Spend per Item"),
+        (f"Difference relative to national ({month_to_label})",            "Spend per Patient"),
+        (f"Difference relative to national ({month_to_label})",            "Financial Impact for 1 month"),
+        (f"Difference relative to national ({month_to_label})",            "Items per Patient"),
+        (f"Difference relative to national ({month_to_label})",            "Spend per Item"),
     ]
 
-    def colour_pct(val):
+    def colour_signed(val):
+        """Red for positive values, green for negative, neutral for zero/NaN/sentinel."""
         if pd.isna(val) or val == 999999.0:
             return ""
         try:
             val = float(val)
         except Exception:
             return ""
-        
-        # Red = positive, green = negative
         if val > 0:
             return "background-color: #f4cccc;"
         elif val < 0:
             return "background-color: #d9ead3;"
-        else:
-            return ""  # neutral zero
-            
+        return ""
 
     styled_table = (
         table_df.style
-        .applymap(colour_pct, subset=percent_cols)
+        .applymap(colour_signed, subset=signed_cols)
     )
 
     # Dynamic height based on the final filtered table
