@@ -1381,7 +1381,7 @@ else:
     pivot["Financial Impact of Change in Spend per Patient"] = np.where(
         (pivot["Spend per Patient - % Change"] == 999999.0) | pivot["Spend per Patient - % Change"].isna(),
         np.nan,
-        (pivot["Spend per Patient - % Change"] / 100.0) * pivot[f"Actual Cost_{month_to}"]
+        (pivot["Spend per Patient - % Change"] / 100.0) * pivot[f"Actual Cost_{month_from}"]
     ).round(0)
 
     # (b) Financial impact of the difference from national spend per patient:
