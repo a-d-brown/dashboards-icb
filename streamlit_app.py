@@ -103,6 +103,7 @@ if not st.session_state.explore_mode:
         "PPIs": ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
         "Bath & Shower Emollients": ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Dicycloverine": ["Spend per 1000 Patients", "Items per 1000 Patients"],
+        "Promethazine": ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Specials": ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "High Cost Drugs": ["Spend per 1000 Patients", "Items per 1000 Patients"]
     }
