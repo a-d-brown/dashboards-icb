@@ -985,7 +985,7 @@ if not st.session_state.explore_mode:
                 practice_data = recent_df.copy()
                 context_label = "across NENC"
 
-            st.header(f"Top 100 Specials (latest 3m) {context_label}")
+            st.header(f"Top 100 Specials ({current_3m_label}) {context_label}")
 
             # Get top 100 presentations by spend
             top_presentations = (
