@@ -2,11 +2,15 @@
 import pandas as pd
 import numpy as np
 import os
+import re
+from datetime import date
+from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import streamlit as st
 from chart_utils import plot_icb_bar_chart, plot_line_chart, plot_high_cost_drugs_scatter
+from medicine_price_lookup import DmdPriceLookup, OUTPUT_COLUMNS, read_codes_csv, write_results_csv
 
 
 ## ── Styling ────────────────────────────────
@@ -69,17 +73,60 @@ initial_highlight = "None"
 if "explore_mode" not in st.session_state:
     st.session_state.explore_mode = False
 
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "dashboard"
+
+
+@st.cache_resource(show_spinner="Loading BNF mapping and dm+d extracts…")
+def get_price_lookup() -> DmdPriceLookup:
+    """Load the local reference data once per Streamlit server."""
+    return DmdPriceLookup(Path(__file__).parent / "price_viewer_data")
+
+
+def get_price_viewer_data_version() -> tuple[str, str]:
+    """Return the mapping date and dm+d release version encoded in local filenames."""
+    data_dir = Path(__file__).parent / "price_viewer_data"
+    mapping_file = next(iter(sorted(data_dir.glob("BNF Snomed Mapping data *.xlsx"))), None)
+    ampp_file = next(iter(sorted(data_dir.glob("f_ampp2_*.xml*"))), None)
+
+    mapping_match = re.search(r"(\d{8})", mapping_file.name) if mapping_file else None
+    mapping_date = mapping_match.group(1) if mapping_match else "Unknown"
+    if mapping_date != "Unknown":
+        mapping_date = f"{mapping_date[:4]}-{mapping_date[4:6]}-{mapping_date[6:]}"
+    release_match = re.search(r"f_ampp2_([^.]*)", ampp_file.name) if ampp_file else None
+    release_version = release_match.group(1) if release_match else "Unknown"
+    return mapping_date, release_version
+
 st.markdown("""
     <style>
+        .block-container {
+            padding-top: 3.75rem;
+        }
         .stSelectbox div[data-baseweb="select"] {
             font-size: 18px;
             width: 100%;
             max-width: 800px;
         }
+        .st-key-enter_explore button,
+        .st-key-enter_price_viewer button,
+        .st-key-exit_benchmark_explorer button,
+        .st-key-exit_price_viewer button {
+            background-color: #e5f2f1;
+            border-color: #8dbfbd;
+            color: #2f6f73;
+        }
+        .st-key-enter_explore button:hover,
+        .st-key-enter_price_viewer button:hover,
+        .st-key-exit_benchmark_explorer button:hover,
+        .st-key-exit_price_viewer button:hover {
+            background-color: #cfe6e4;
+            border-color: #2f6f73;
+            color: #24575a;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-if not st.session_state.explore_mode:
+if st.session_state.current_page == "dashboard":
 
     ## ── Constants: Mappings and Settings ───────────
 
@@ -241,12 +288,12 @@ if not st.session_state.explore_mode:
     copd_list_size_df = copd_list_size_df[['Practice', 'COPD Register']]
     copd_list_size_df.rename(columns={'COPD Register': 'COPD List Size'}, inplace=True)
 
-    # UI SELECTORS
-    col1_title, col2_subloc, col_divider, col3_dataset = st.columns([2.5, 1.4, 0.05, 1.4])
+    # Header and page navigation
+    header_title, header_navigation = st.columns([3, 2])
 
-    with col1_title:
+    with header_title:
         st.markdown("""
-            <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 1rem;">
+            <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 0.75rem;">
                 <div style="font-size: clamp(20px, 4vw, 36px); font-weight: bold;">
                     NENC Medicines Optimisation Workstream Dashboard
                 </div>
@@ -256,16 +303,25 @@ if not st.session_state.explore_mode:
             </div>
         """, unsafe_allow_html=True)
 
-        if "explore_mode" not in st.session_state:
-            st.session_state.explore_mode = False
-
+    with header_navigation:
         def enter_explore():
-            st.session_state.explore_mode = True
+            st.session_state.current_page = "bnf_explorer"
 
-        def exit_explore():
-            st.session_state.explore_mode = False
+        def enter_price_viewer():
+            st.session_state.current_page = "price_viewer"
 
-        st.button("Go to BNF explorer", on_click=enter_explore, key="enter_explore")
+        st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
+
+        bnf_button_col, price_button_col = st.columns(2, gap="small")
+        with bnf_button_col:
+            st.button("Benchmark Explorer", on_click=enter_explore, key="enter_explore")
+        with price_button_col:
+            st.button("Price Viewer", on_click=enter_price_viewer, key="enter_price_viewer")
+
+    st.markdown("<hr style='margin: 0.25rem 0 1rem;'>", unsafe_allow_html=True)
+
+    # Dashboard selectors
+    col_chart_controls, col2_subloc, col_divider, col3_dataset = st.columns([2.5, 1.4, 0.05, 1.4])
 
     with col2_subloc:
         subloc_options = ["Show all"] + list(sub_location_colors.keys())
@@ -315,6 +371,16 @@ if not st.session_state.explore_mode:
             cost_filter_threshold = None
 
     ## ── Data Loading ───────────────────────────────
+    mode_option = "Current Rate"
+    with col_chart_controls:
+        if dataset_type != "High Cost Drugs":
+            mode_option = st.radio(
+                "Bar chart display:",
+                ["Current Rate", "Recent change", "Annual change"],
+                index=0,
+                horizontal=True,
+            )
+
     icb_data_preprocessed, national_data_preprocessed = load_data(dataset_type)
 
     numerator_column   = measure_metadata[measure_type]["numerator_column"]
@@ -522,10 +588,6 @@ if not st.session_state.explore_mode:
     use_year_change = False
 
     if dataset_type != "High Cost Drugs":
-        mode_option = st.radio(
-            "", ["Current Rate", "Recent change", "Annual change"],
-            index=0, horizontal=True
-        )
         use_delta_chart = mode_option == "Recent change"
         use_year_change = mode_option == "Annual change"
 
@@ -821,26 +883,30 @@ if not st.session_state.explore_mode:
         st.plotly_chart(line_fig, use_container_width=True)
 
 
-else:
+elif st.session_state.current_page == "bnf_explorer":
     # ══════════════════════════════════════════════════════════════════════
     # BNF EXPLORER MODE
     # ══════════════════════════════════════════════════════════════════════
 
-    if st.button("← Go to prebuilt measures"):
-        st.session_state.explore_mode = False
-        st.rerun()
-
     # ── NEW: View-level radio buttons ─────────────────────────────────────
-    view_level = st.radio(
-        "View data by:",
-        ["ICB level", "GP Practice level"],
-        index=0,
-        horizontal=True,
-        help=(
-            "ICB level: all practices within each ICB aggregated into a single row.  "
-            "GP Practice level: one row per GP practice (NENC only)."
+    explorer_content, col_bnf = st.columns([2, 1])
+    with explorer_content:
+        if st.button("← Go to prebuilt measures", key="exit_benchmark_explorer"):
+            st.session_state.current_page = "dashboard"
+            st.rerun()
+
+        st.markdown("<div style='height: 0.35rem;'></div>", unsafe_allow_html=True)
+
+        view_level = st.radio(
+            "View data by:",
+            ["ICB level", "GP Practice level"],
+            index=0,
+            horizontal=True,
+            help=(
+                "ICB level: all practices within each ICB aggregated into a single row.  "
+                "GP Practice level: one row per GP practice (NENC only)."
+            )
         )
-    )
 
     # ── Load national data (always needed for ICB mode and England benchmark) ──
     all_drugs_df = load_all_drugs()
@@ -884,17 +950,7 @@ else:
     NENC_ICB    = DEFAULT_ICB   # alias used in practice mode
 
     # ── UI columns: ICB selector + BNF search ─────────────────────────────
-    col_icb, col_bnf = st.columns([2, 1])
-
-    with col_icb:
-        if view_level == "ICB level":
-            icb_choices   = sorted(all_drugs_df["ICB plus Code"].dropna().unique())
-            default_index = icb_choices.index(DEFAULT_ICB) if DEFAULT_ICB in icb_choices else 0
-            selected_icb  = st.selectbox("Select ICB:", icb_choices, index=default_index)
-        else:
-            # Practice mode always shows NENC
-            selected_icb = NENC_ICB
-            st.info(f"📍 Showing GP practices within **NHS NENC ICB** only.")
+    selected_icb = NENC_ICB
 
     with col_bnf:
         search_level_label = st.selectbox(
@@ -956,7 +1012,7 @@ else:
                 term        = bnf_search.strip().casefold()
                 suggestions = [x for x in all_terms if term in x.casefold()][:10]
 
-                if suggestions:
+                if suggestions and search_level_label != "BNF Chemical Substance":
                     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
                     category_col, granularity_col = st.columns(2, gap="small")
                     allowed_breakdown_levels = BNF_LEVEL_ORDER[BNF_LEVEL_ORDER.index(search_level_label):]
@@ -1141,7 +1197,7 @@ else:
     # ══════════════════════════════════════════════════════════════════════
     # BRANCH: ICB level (original behaviour)
     # ══════════════════════════════════════════════════════════════════════
-    st.header("BNF explorer")
+    st.header("Benchmark Explorer")
 
     if view_level == "ICB level":
 
@@ -1488,3 +1544,64 @@ else:
             "Download table (CSV)", csv,
             file_name="practice_exploration_table.csv"
         )
+
+
+elif st.session_state.current_page == "price_viewer":
+    if st.button("← Go to prebuilt measures", key="exit_price_viewer"):
+        st.session_state.current_page = "dashboard"
+        st.rerun()
+
+    st.title("BNF medicine price lookup")
+    st.caption(
+        "Look up pack-level dm+d prices using the local BNF-to-SNOMED mapping "
+        "and reference-data extracts."
+    )
+    uploaded = st.file_uploader(
+        "Upload a CSV with a BNF Code or bnf_code column",
+        type="csv",
+        key="price_viewer_upload",
+    )
+    as_of = st.date_input(
+        "Prices effective on or before",
+        value=date.today(),
+        key="price_viewer_as_of",
+    )
+
+    if uploaded:
+        try:
+            codes = read_codes_csv(uploaded.getvalue())
+            if not codes:
+                st.error("The CSV contains no data rows.")
+            else:
+                rows = get_price_lookup().lookup_codes(codes, as_of)
+                st.success(f"Processed {len(codes)} input code(s); returned {len(rows)} row(s).")
+                st.dataframe(
+                    rows,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_order=OUTPUT_COLUMNS,
+                )
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+                    write_results_csv(rows, tmp.name)
+                    csv_bytes = Path(tmp.name).read_bytes()
+                Path(tmp.name).unlink(missing_ok=True)
+                st.download_button(
+                    "Download results CSV",
+                    csv_bytes,
+                    "bnf_medicine_prices.csv",
+                    "text/csv",
+                    key="price_viewer_download",
+                )
+        except (ValueError, FileNotFoundError) as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.exception(exc)
+
+    mapping_date, release_version = get_price_viewer_data_version()
+    st.caption(
+        "Contains NHSBSA Dictionary of Medicines and Devices (dm+d) data, licensed under "
+        "[Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). "
+        f"Source: NHS TRUD. BNF mapping date: {mapping_date}; dm+d release: {release_version}."
+    )
