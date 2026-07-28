@@ -43,7 +43,16 @@ def _text(element: ET.Element, tag: str) -> str:
 
 
 def _normalise_code(value: object) -> str:
-    return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())
+    raw = str(value or "").upper().strip()
+    # Accept either a bare BNF code or a display value such as
+    # "Ursodeoxycholic acid 0109010U0".
+    embedded_codes = re.findall(
+        r"(?<![A-Z0-9])([0-9]{7}[A-Z][0-9](?:[A-Z]{2}(?:[A-Z]{4})?)?)(?![A-Z0-9])",
+        raw,
+    )
+    if embedded_codes:
+        return embedded_codes[-1]
+    return re.sub(r"[^A-Z0-9]", "", raw)
 
 
 def _iso_date(value: str) -> date | None:
@@ -201,13 +210,18 @@ class DmdPriceLookup:
 
     @staticmethod
     def _level(code: str) -> str | None:
-        # The supplied mapping contains BNF chemical codes (11 characters) and
-        # presentation/product codes (15 characters). Shorter hierarchy codes
-        # are intentionally unsupported because they are broader than chemical.
-        return {11: "Chemical", 15: "Presentation / Product"}.get(len(code))
+        # Standard BNF code lengths used by the supplied mapping:
+        # 9 characters = chemical substance, 11 = product, 15 = presentation.
+        return {
+            9: "Chemical",
+            11: "Product",
+            15: "Presentation",
+        }.get(len(code))
 
     def _mapped_concepts(self, code: str) -> list[Concept]:
-        if len(code) == 11:
+        if len(code) == 9:
+            # Chemical codes are the common prefix of their product and
+            # presentation mapping rows, so collect all descendants.
             concepts = [c for key, values in self.mapping.items() if key.startswith(code) for c in values]
         else:
             concepts = list(self.mapping.get(code, []))
@@ -237,8 +251,14 @@ class DmdPriceLookup:
         if not code:
             return [base | {"status": "invalid_bnf_code", "message": "Blank BNF code."}]
         if not level:
-            message = ("BNF code is less specific than Chemical level." if len(code) < 11
-                       else "BNF code is not a supported 11-character Chemical or 15-character Presentation/Product code.")
+            message = (
+                "BNF code is less specific than Chemical level."
+                if len(code) < 9
+                else (
+                    "BNF code is not a supported 9-character Chemical, "
+                    "11-character Product, or 15-character Presentation code."
+                )
+            )
             return [base | {"status": "unsupported_bnf_code", "message": message}]
         concepts = self._mapped_concepts(code)
         if not concepts:
