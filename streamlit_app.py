@@ -153,6 +153,7 @@ if st.session_state.current_page == "dashboard":
     }
 
     dataset_measures = {
+        "Rifaximin":                       ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Antibacterials":                  ["Spend per 1000 Patients", "Items per 1000 Patients", "DDD per 1000 Patients"],
         "Gabapentinoids":                  ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
         "Opioids":                         ["Spend per 1000 Patients", "Items per 1000 Patients", "ADQ per 1000 Patients"],
