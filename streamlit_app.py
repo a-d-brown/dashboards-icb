@@ -167,6 +167,8 @@ if st.session_state.current_page == "dashboard":
         "Bath & Shower Emollients":        ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Dicycloverine":                   ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Promethazine":                    ["Spend per 1000 Patients", "Items per 1000 Patients"],
+        "Enteral Nutrition":               ["Spend per 1000 Patients", "Items per 1000 Patients"],
+        "Dressings":                       ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Cloral betaine + Chloral hydrate":["Spend per 1000 Patients", "Items per 1000 Patients"],
         "Specials":                        ["Spend per 1000 Patients", "Items per 1000 Patients"],
         "High Cost Drugs":                 ["Spend per 1000 Patients", "Items per 1000 Patients"]
